@@ -2,7 +2,7 @@ import os
 from telegrame import *
 from commands import *
 
-__version__ = "0.4.5"
+__version__ = "0.4.8"
 
 print(f"DSPLabsTestTaskBot v{__version__}")
 
@@ -99,17 +99,19 @@ def start():
             send_message(message.chat.id, f"Hello, human #{message.chat.id}")
         if error_message:
             send_message(message.chat.id, f"ERROR:{error_message}")
-        send_message(message.chat.id,
-                         f"All sended voice messages collected in filesystem.{newline}"
-                         f"You can send your voice message to store it on my server.{newline}"
-                         f"Of cource, you also can request saved voice messages.{newline}"
-                         f"You can send chat id like this: 5328715{newline}"
-                         f"Or if you need specific message, send chat id and voice id: 5328715 0{newline}"
-                         f"And yes, this is real mine chat id, so you can listen my message :){newline}"
-                         f"If you just want to get your chat id, send command '/chatid'.{newline}"
-                         f"For deletion send 'delete <chat id>' for delete all messages {newline}"
-                         f"or 'delete <chat id> <voice id>'.{newline}"
-                         f"For get list of all saved voice mails, type /list")
+        send_message(message.chat.id, f"""All recieved voice messages will be saved.
+
+You can request voice messages by chat id: '5328715'
+If you need specific message, send chat id and voice id: '5328715 0'
+
+And yes, this is real mine chat id, so you can listen my message :)
+
+If you just want to get your chat id, send command '/chatid'.
+
+For deletion all messages from user, send: '/delete 5328715'
+Or for specific message add voice id: '/delete 5328715 0'.
+
+For get list of all saved voice mails, type '/list'""")
 
     @bot.message_handler(commands=['chatid', 'chat_id'])
     def chatid(message):
@@ -143,7 +145,7 @@ def start():
             mark_as_deleted(get_voice_path(chat_id, voice_id))
             send_message(message.chat.id, f"Deleted voice {chat_id} {voice_id}")
         else:
-            send_help(message, f"not deleted {message.text}")
+            send_help(message, f"not deleted, cannot parse chat id or voice id: '{message.text}'")
 
     @bot.message_handler(commands=["list"])
     def send_list(message):
