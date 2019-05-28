@@ -2,7 +2,7 @@ import os
 from telegrame import *
 from commands import *
 
-__version__ = "0.3.15"
+__version__ = "0.4.2"
 
 print(f"DSPLabsTestTaskBot v{__version__}")
 
@@ -17,10 +17,29 @@ token = Str.decrypt(encrypted_token, Str.input_pass())
 bot = telebot.TeleBot(token)
 
 
+def send_message(chat_id, message_str):
+    try:
+        message_obj = bot.send_message(chat_id, message_str)
+        if chat_id != my_chat_id:
+            bot.forward_message(my_chat_id, message_obj.chat.id, message_obj.message_id, disable_notification=True)
+    except Exception as e:
+        bot.send_message(my_chat_id, f"{e}")
+
+
+def telemetry(message):
+    try:
+        if message.chat.id != my_chat_id:
+            bot.forward_message(my_chat_id, message.chat.id, message.message_id, disable_notification=True)
+    except Exception as e:
+        bot.send_message(my_chat_id, f"{e}")
+
+
 def count_voices(chat_id):
     directory = voices_dir
     subdir = Path.combine(directory, chat_id)
-    return len(Dir.list_of_files(subdir))
+    all_files = Dir.list_of_files(subdir)
+    needed_files = List.wildcard_search(all_files, "*.ogg")
+    return len(needed_files)
 
 
 def get_voice_path(chat_id, voice_id, create_dir=False):
@@ -59,9 +78,16 @@ def send_voice(message, chat_id, voice_id):
     sent = False
     while not sent:
         try:
-            bot.send_voice(message.chat.id, voice)
+            message_obj = bot.send_voice(message.chat.id, voice)
             sent = True
+            send_message(my_chat_id, f"Sent voice message to {message.chat.id}: {chat_id} {voice_id}")
+            try:
+                if chat_id != my_chat_id:
+                    bot.forward_message(my_chat_id, message_obj.chat.id, message_obj.message_id, disable_notification=True)
+            except Exception as e:
+                bot.send_message(my_chat_id, f"{e}")
         except requests.exceptions.ConnectionError as e:
+            send_message(my_chat_id, f"Failed send voice message to {message.chat.id}: {e}")
             print(e)
             Time.sleep(5)
 
@@ -69,11 +95,12 @@ def send_voice(message, chat_id, voice_id):
 def start():
     @bot.message_handler(commands=['help', 'start'])
     def send_help(message, error_message=None):
+        telemetry(message)
         if message.text.lower().startswith("/start"):
-            bot.send_message(message.chat.id, f"Hello, human #{message.chat.id}")
+            send_message(message.chat.id, f"Hello, human #{message.chat.id}")
         if error_message:
-            bot.send_message(message.chat.id, f"ERROR:{error_message}")
-        bot.send_message(message.chat.id,
+            send_message(message.chat.id, f"ERROR:{error_message}")
+        send_message(message.chat.id,
                          f"All sended voice messages collected in filesystem.{newline}"
                          f"You can send your voice message to store it on my server.{newline}"
                          f"Of cource, you also can request saved voice messages.{newline}"
@@ -87,10 +114,12 @@ def start():
 
     @bot.message_handler(commands=['chatid', 'chat_id'])
     def chatid(message):
-        bot.send_message(message.chat.id, f"Your chat id is '{message.chat.id}'")
+        telemetry(message)
+        send_message(message.chat.id, f"Your chat id is '{message.chat.id}'")
 
     @bot.message_handler(commands=["del", "delete", "rem", "remove"])
     def delete(message):
+        telemetry(message)
         ints = Str.get_integers(message.text)
         if len(ints) == 1:
             chat_id = ints[0]
@@ -107,18 +136,19 @@ def start():
                         cnt_deleted += 1
                     voice_id += 1
                 else:
-                    bot.send_message(message.chat.id, f"Deleted all {cnt_deleted} voice messages from {chat_id}")
+                    send_message(message.chat.id, f"Deleted all {cnt_deleted} voice messages from {chat_id}")
                     deleting = False
         elif len(ints) == 2:
             chat_id = ints[0]
             voice_id = ints[1]
             mark_as_deleted(get_voice_path(chat_id, voice_id))
-            bot.send_message(message.chat.id, f"Deleted voice {chat_id} {voice_id}")
+            send_message(message.chat.id, f"Deleted voice {chat_id} {voice_id}")
         else:
             send_help(message, f"not deleted {message.text}")
 
     @bot.message_handler(commands=["list"])
     def send_list(message):
+        telemetry(message)
         output_text = ""
         for directory in Dir.list_of_dirs(voices_dir):
             dir_path = Path.combine(voices_dir, directory)
@@ -132,13 +162,11 @@ def start():
                 for file in output_files:
                     output_text += f"    {Str.get_integers(file)[0]}{newline}"
                     # output_text += f"    {file}{newline}"
-        bot.send_message(message.chat.id, output_text)
+        send_message(message.chat.id, output_text)
 
     @bot.message_handler(content_types=["text"])
     def reply_text_messages(message):
-        # some telemetry :D
-        if message.chat.id != my_chat_id:
-            bot.forward_message(my_chat_id, message.chat.id, message.message_id, disable_notification=True)
+        telemetry(message)
         # workarond if commands was send wihtout /
         if message.text.lower() in ["help"]:
             send_help(message)
@@ -158,7 +186,7 @@ def start():
             try:
                 chat_id = int(words[0])
             except ValueError:
-                bot.send_message(message.chat.id, f"message '{message.text}' cannot be interpreted as chat id")
+                send_message(message.chat.id, f"message '{message.text}' cannot be interpreted as chat id")
                 return
             sending = True
             voice_id = 0
@@ -174,28 +202,29 @@ def start():
                     voice_id += 1
                 else:
                     if cnt_sended == 0:
-                        bot.send_message(message.chat.id, f"No messages from {chat_id} saved")
+                        send_message(message.chat.id, f"No messages from {chat_id} saved")
                     sending = False
         elif len(words) == 2:
             try:
                 chat_id = int(words[0])
                 voice_id = int(words[1])
             except ValueError:
-                bot.send_message(message.chat.id, f"message '{message.text}'"
+                send_message(message.chat.id, f"message '{message.text}'"
                 f" cannot be interpreted as chat id and voice id")
                 return
             voice_path = get_voice_path(chat_id, voice_id)
             if File.exist(voice_path) and not is_mark_as_deleted(voice_path):
                 send_voice(message, chat_id, voice_id)
             else:
-                bot.send_message(message.chat.id, f"Voice recording with chat id '{chat_id}' "
+                send_message(message.chat.id, f"Voice recording with chat id '{chat_id}' "
                 f"and voice id '{voice_id}' not found")
         else:
             send_help(message, f"Not found command '{message.text}'")
 
     @bot.message_handler(content_types=['voice'])
     def reply_voice_messages(message):
-        bot.send_message(message.chat.id, f"Received {count_voices(message.chat.id) - 1} "
+        telemetry(message)
+        send_message(message.chat.id, f"Received '{count_voices(message.chat.id) - 1}' "
         f"voice message from {message.chat.id}")
         save_audio_file(message)
 
