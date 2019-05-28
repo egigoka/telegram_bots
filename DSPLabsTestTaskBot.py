@@ -2,7 +2,7 @@ import os
 from telegrame import *
 from commands import *
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 print(f"DSPLabsTestTaskBot v{__version__}")
 
@@ -223,7 +223,7 @@ def start():
     @bot.message_handler(content_types=['voice'])
     def reply_voice_messages(message):
         telemetry(message)
-        send_message(message.chat.id, f"Received '{count_voices(message.chat.id) - 1}' "
+        send_message(message.chat.id, f"Received '{count_voices(message.chat.id)}' "
         f"voice message from {message.chat.id}")
         save_audio_file(message)
 
