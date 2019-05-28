@@ -2,7 +2,7 @@ import os
 from telegrame import *
 from commands import *
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 print(f"DSPLabsTestTaskBot v{__version__}")
 
@@ -81,7 +81,7 @@ def send_voice(message, chat_id, voice_id):
             message_obj = bot.send_voice(message.chat.id, voice)
             sent = True
             try:
-                if chat_id != my_chat_id:
+                if message.chat.id != my_chat_id:
                     bot.forward_message(my_chat_id, message_obj.chat.id, message_obj.message_id, disable_notification=True)
             except Exception as e:
                 bot.send_message(my_chat_id, f"{e}")
