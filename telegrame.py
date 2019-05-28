@@ -2,9 +2,7 @@ import requests
 try:
     from commands import *
 except ImportError:
-    import os
-    os.system("pip install git+https://github.com/egigoka/commands")
-    from commands import *
+    from bootstrapping_module import * 
 try:
     import telebot
 except ImportError:
@@ -12,8 +10,7 @@ except ImportError:
     Pip.install("pytelegrambotapi")
     import telebot
 
-__version__ = "0.0.2"
-
+__version__ = "0.0.3"
 
 def safe_start_bot(bot_func, skipped_exceptions=(requests.exceptions.ReadTimeout,
                                                  requests.exceptions.ConnectionError,
