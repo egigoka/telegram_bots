@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.4.1"
+__version__ = "1.4.3"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -29,7 +29,10 @@ class Arguments:
 
 class State:
     def __init__(self):
-        self.config_json = Json(Path.combine(os.path.split(__file__)[0], "configs", "telegram_bot_todoist.json"))
+        f = Path.safe__file__(os.path.split(__file__)[0])
+        json_path = Path.combine(f, "configs", "telegram_bot_todoist.json")
+        print(json_path)
+        self.config_json = Json(json_path)
 
         self.first_message = True
         self.getting_project_name = False
@@ -183,7 +186,7 @@ def start_todoist_bot():
                                                text=current_todo)  # , reply_markup=markup)
                 State.last_todo_str = Str.substring(current_todo, "", "<").strip()
 
-            a = MyThread(1, update_last_todo_message, "Getting random todo", args=(last_message,), quiet=True, daemon=True)
+            a = MyThread(update_last_todo_message, "Getting random todo", args=(last_message,), quiet=True, daemon=True)
             a.start()
 
 

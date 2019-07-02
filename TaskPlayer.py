@@ -85,7 +85,7 @@ State = State()
 
 def _start_taskplayer_bot_reciever():
     @telegram_api_taskplayer.message_handler(content_types=["text", 'sticker'])
-    def reply_all_messages_ola(message):
+    def reply_all_messages(message):
 
         if message.chat.id == my_chat_id:
             if message.text:
