@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.5.7"
+__version__ = "1.5.8"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -83,6 +83,7 @@ class State:
         self.sent_messages = 1
 
         self.last_radnom_todo_str = "not inited"
+        self.updating = False
 
 
 
@@ -152,7 +153,12 @@ def get_random_todo(todo_api):
 
 
 def todo_updater(todo_api):
+    if State.updating:
+        Print("skip updating, thread already running")
+        return
+    State.updating = True
     State.last_radnom_todo_str = get_random_todo(todo_api=todo_api)
+    State.updating = False
 
 
 def start_todoist_bot():

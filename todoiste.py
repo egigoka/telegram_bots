@@ -298,16 +298,6 @@ def main():
     if Arguments.name:
         print("@"+todo.api.state["user"]["full_name"])
 
-    # if Arguments.cleanup:
-    #     if CLI.get_y_n(f'Do you really want to remove all data in account {todo.api.state["user"]["full_name"]}'):
-    #         for task in todo.api.items.all():
-    #             task.delete()
-    #             Print.colored("    Task", task["content"], "deleted", "red")
-    #         for project_id in todo.api.projects.all():
-    #             project_id.delete()
-    #             Print.colored("Project", project_id["name"], "deleted", "red")
-    #         todo.api.commit()
-
     if Arguments.list:
         projects = todo.projects_all_names()
         for project_name, project_id in Dict.iterable(projects):
