@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.5.6"
+__version__ = "1.5.7"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -195,11 +195,8 @@ def start_todoist_bot():
                 #                               text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=markup)
                                                text=current_todo)  # , reply_markup=markup)
 
-            a = MyThread(update_last_todo_message, "Getting random todo", args=(last_message,), quiet=False, daemon=True)
-            a.start()
             State.last_todo_str = Str.substring(current_todo, "", "<").strip()
-
-            todo_updater_thread = MyThread(todo_updater, args=(todoist_api,), daemon=True)
+            todo_updater_thread = MyThread(todo_updater, args=(todoist_api,), daemon=True, quiet=False)
             todo_updater_thread.start()
 
         if message.chat.id != my_chat_id:
