@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.4.3"
+__version__ = "1.5.6"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -75,10 +75,14 @@ class State:
         self.counter_for_left_items = True
         self.counter_for_left_items_int = 0
 
+        self.counter_all_items = 0
+
         self.all_todo_str = ""
         self.last_todo_str = ""
 
         self.sent_messages = 1
+
+        self.last_radnom_todo_str = "not inited"
 
 
 
@@ -92,60 +96,70 @@ encrypted_telegram_token = [-15, -21, -49, -16, -63, -52, -46, 6, -20, -13, -40,
 telegram_token = Str.decrypt(encrypted_telegram_token, todoist_password_for_api_key)
 
 
+def get_random_todo(todo_api):
+    print(Time.dotted())
+    Print.rewrite("Getting random todo")
+    bench = Bench(prefix="Get random item in")
+    bench.start()
+    incomplete_items = todo_api.all_incomplete_items_in_account()
+    bench.end()
+
+    State.counter_for_left_items_int = 0
+    State.counter_all_items = 0
+
+    State.all_todo_str = ""
+    for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing excluded
+        State.counter_all_items += len(project_items)
+        if project_name.strip() in State.excluded_projects:
+            incomplete_items[project_name] = []
+            continue
+        if project_items:
+            # print(f'"{project_name}"')
+            State.all_todo_str += project_name + newline
+        for item in project_items.copy():
+
+            if item["content"].strip() in State.excluded_items:
+                incomplete_items[project_name].remove(item)
+                # print(f'    "{item["content"]}" deleted')
+            else:
+                State.counter_for_left_items_int += 1
+                # print(f'    "{item["content"]}"')
+                State.all_todo_str += "    " + item["content"] + newline
+
+    for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing empty projects
+        if not project_items:
+            incomplete_items.pop(project_name)
+
+    try:
+        random_project_name, random_project_items = Random.item(incomplete_items)
+    except IndexError:
+        return "All done!"
+    random_item = Random.item(random_project_items)
+
+    try:
+        if not random_item["due_date_utc"].endswith("20:59:59 +0000"):
+            time_string = random_item["date_string"]
+    except KeyError:
+        time_string = ""
+
+    counter_for_left_items_str = ""
+    if State.counter_for_left_items:
+        counter_for_left_items_str = f"({State.counter_for_left_items_int}/{State.counter_all_items} left)"
+
+    Print.rewrite()
+    return f"{random_item['content']} <{random_project_name}> {time_string} {counter_for_left_items_str}".replace(
+        ">  (", "> (")
+
+
+def todo_updater(todo_api):
+    State.last_radnom_todo_str = get_random_todo(todo_api=todo_api)
+
+
 def start_todoist_bot():
-    def get_random_todo(todo_api):
-        print(Time.dotted())
-        Print.rewrite("Getting random todo")
-        bench = Bench(prefix="Get random item in")
-        bench.start()
-        incomplete_items = todo_api.all_incomplete_items_in_account()
-        bench.end()
-
-        State.counter_for_left_items_int = 0
-
-        State.all_todo_str = ""
-        for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing excluded
-            if project_name.strip() in State.excluded_projects:
-                incomplete_items[project_name] = []
-                continue
-            if project_items:
-                # print(f'"{project_name}"')
-                State.all_todo_str += project_name + newline
-            for item in project_items.copy():
-
-                if item["content"].strip() in State.excluded_items:
-                    incomplete_items[project_name].remove(item)
-                    # print(f'    "{item["content"]}" deleted')
-                else:
-                    State.counter_for_left_items_int += 1
-                    # print(f'    "{item["content"]}"')
-                    State.all_todo_str += "    " + item["content"] + newline
-
-        for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing empty projects
-            if not project_items:
-                incomplete_items.pop(project_name)
-
-        try:
-            random_project_name, random_project_items = Random.item(incomplete_items)
-        except IndexError:
-            return "All done!"
-        random_item = Random.item(random_project_items)
-
-        try:
-            if not random_item["due_date_utc"].endswith("20:59:59 +0000"):
-                time_string = random_item["date_string"]
-        except KeyError:
-            time_string = ""
-
-        counter_for_left_items_str = ""
-        if State.counter_for_left_items:
-            counter_for_left_items_str = f"({State.counter_for_left_items_int} left)"
-
-        return f"{random_item['content']} <{random_project_name}> {time_string} {counter_for_left_items_str}".replace(
-            ">  (", "> (")
-
     todoist_api = Todoist(todoist_api_key)
     telegram_api = telebot.TeleBot(telegram_token, threaded=False)
+
+    todo_updater(todoist_api)  # initing for fist message
 
     @telegram_api.message_handler(content_types=["text"])
     def reply_all_messages(message):
@@ -176,19 +190,17 @@ def start_todoist_bot():
             else:
                 excluded_str += f"{newline}No excluded items."
 
-            # telegram_api.send_message(message.chat.id, f"{excluded_str}{newline}wait")
-            telegram_api.send_message(message.chat.id, "wait")
-
-            def update_last_todo_message(message_id):
-                current_todo = get_random_todo(todoist_api)
-                telegram_api.edit_message_text(chat_id=message.chat.id, message_id=message_id,
+            current_todo = State.last_radnom_todo_str
+            telegram_api.send_message(chat_id=message.chat.id,
                 #                               text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=markup)
                                                text=current_todo)  # , reply_markup=markup)
-                State.last_todo_str = Str.substring(current_todo, "", "<").strip()
 
-            a = MyThread(update_last_todo_message, "Getting random todo", args=(last_message,), quiet=True, daemon=True)
+            a = MyThread(update_last_todo_message, "Getting random todo", args=(last_message,), quiet=False, daemon=True)
             a.start()
+            State.last_todo_str = Str.substring(current_todo, "", "<").strip()
 
+            todo_updater_thread = MyThread(todo_updater, args=(todoist_api,), daemon=True)
+            todo_updater_thread.start()
 
         if message.chat.id != my_chat_id:
             telegram_api.send_message(message.chat.id, "ACCESS DENY!")
