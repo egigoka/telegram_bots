@@ -1,6 +1,6 @@
 #! python3
 # -*- coding: utf-8 -*-
-import datetime
+import sys
 try:
     from commands import *
 except ImportError:
@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.7.3"
+__version__ = "0.9.0"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -26,15 +26,29 @@ encrypted_telegram_token_taskplayer = [-14, -18, -50, -16, -61, -56, -42, 1, -21
                                        50, 12, 50, -21, -58, -17, 36, 29, -14, -60, 41, -27, -56, -7, 58, 41, 31, -56,
                                        33, -12, 12, -19, 48, 42, 4, 8, 47, -34]
 
+def reset_password():
+    password = Str.input_pass()
+    GIV["api_password"] = password
+    return password
 
-telegram_token_taskplayer = Str.decrypt(encrypted_telegram_token_taskplayer, Str.input_pass())
+try:
+    password = GIV["api_password"]
+    if "reset" in sys.argv:
+        password = reset_password()
+except (NameError, KeyError):
+    password = reset_password()
+
+telegram_token_taskplayer = Str.decrypt(encrypted_telegram_token_taskplayer, password)
 
 telegram_api_taskplayer = telebot.TeleBot(telegram_token_taskplayer, threaded=False)
 
 
 class State:
     def __init__(self):
-        self.task_dict = {'Work': 1800, 'Home': 1800}
+        self.task_dict = Json(Path.combine('.', "configs", "TaskPlayer.json"))
+        if len(self.task_dict) == 0:
+            self.task_dict["Work"] = 1800
+            self.task_dict["Home"] = 1800
         self.current_task_name = None
         self.current_task_timer = Bench(quiet=True)
         self.current_task_time = 0
@@ -77,7 +91,8 @@ class State:
         self.reset_timer()
 
     def set_dict(self, dict_):
-        self.task_dict = dict_
+        self.task_dict.string = dict_
+        self.task_dict.save()
         self.set_first_task()
 
 

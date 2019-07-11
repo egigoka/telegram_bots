@@ -4,6 +4,9 @@ import string
 import sys
 import time
 import datetime
+
+__version__ = "1.0.0"
+
 try:
     from commands import *
     from commands.id9 import ID
@@ -283,11 +286,24 @@ class Todoist:
                 return "not today"
 
 
-
 encrypted_todoist_token = [-20, -20, -50, -14, -61, -54, 2, 0, 32, 27, -51, -21, -54, -53, 4, 3, 29, -14, -51, 29, -10, -6, 1, 4, 28,
                            29, -55, -17, -59, -9, 2, 50, -13, -14, -52, -15, -56, -59, -44, 5]  # yes, that shitty
 
-todoist_password_for_api_key = Str.input_pass()
+
+def reset_password():
+    password = Str.input_pass()
+    GIV["api_password"] = password
+    return password
+
+
+try:
+    password = GIV["api_password"]
+    if "reset" in sys.argv:
+        password = reset_password()
+except (NameError, KeyError):
+    password = reset_password()
+
+todoist_password_for_api_key = password
 todoist_api_key = Str.decrypt(encrypted_todoist_token, todoist_password_for_api_key)
 
 def main():

@@ -1,6 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 import datetime
+import sys
 try:
     from commands import *
 except ImportError:
@@ -15,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "1.6.1"
+__version__ = "1.7.0"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -26,7 +27,19 @@ encrypted_telegram_token_olacushatc = [-14, -22, -51, -21, -57, -55, -42, 6, -20
                                        -11, -31, -47, 49, 46, 45, -60, 30, -26]
 
 
-telegram_token_olacushatc = Str.decrypt(encrypted_telegram_token_olacushatc, Str.input_pass())
+def reset_password():
+    password = Str.input_pass()
+    GIV["api_password"] = password
+    return password
+
+try:
+    password = GIV["api_password"]
+    if "reset" in sys.argv:
+        password = reset_password()
+except (NameError, KeyError):
+    password = reset_password()
+
+telegram_token_olacushatc = Str.decrypt(encrypted_telegram_token_olacushatc, password)
 # telegram_token = Str.decrypt(encrypted, Str.input_pass("Enter password:"))
 
 telegram_api_olacushatcs = telebot.TeleBot(telegram_token_olacushatc, threaded=False)

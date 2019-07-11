@@ -3,7 +3,7 @@
 import sys
 import os
 
-__version = "0.1.0"
+__version = "0.2.0"
 
 try:
     from commands import *
@@ -37,7 +37,21 @@ encrypted_telegram_token = [-14, -15, -57, -17, -62, -55, -40, 5, -14, -13, -40,
                             4, -41, -15, 52, -12, 42, -52, 50, -3, 2, -28, 49, 50, -4, -23, -14, -31, -22, 17, 62, -3,
                             -16, 7, -15, -4]
 
-telegram_token = Str.decrypt(encrypted_telegram_token, Str.input_pass())
+
+def reset_password():
+    password = Str.input_pass()
+    GIV["api_password"] = password
+    return password
+
+
+try:
+    password = GIV["api_password"]
+    if "reset" in sys.argv:
+        password = reset_password()
+except (NameError, KeyError):
+    password = reset_password()
+
+telegram_token = Str.decrypt(encrypted_telegram_token, password)
 
 
 def start_ssh_bot():
