@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.7.0"
+__version__ = "0.7.3"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -56,6 +56,7 @@ class State:
         self.current_task_name = task[0]
         self.current_task_time = task[1]
         self.current_task_timer.start()
+        State.current_task_started = False
         return True
 
     def reset_timer(self):
@@ -170,7 +171,8 @@ def _start_taskplayer_bot_sender():
                 message_obj = telegram_api_taskplayer.send_message(my_chat_id, message_text)
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
-            if minutes_passed != State.last_sent_mins:
+                State.last_sent_mins = minutes_passed
+            elif minutes_passed != State.last_sent_mins:
                 message_text = f"Current task is {State.current_task_name} {minutes_left} minutes left"
                 telegram_api_taskplayer.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
                                                text=message_text)
@@ -182,6 +184,7 @@ def _start_taskplayer_bot_sender():
                 message_obj = telegram_api_taskplayer.send_message(my_chat_id, message_text)
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
+                State.last_sent_secs = seconds_passed
             if seconds_passed != State.last_sent_secs:
                 message_text = f"Current task is {State.current_task_name} {seconds_left} seconds left"
                 telegram_api_taskplayer.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
