@@ -5,31 +5,36 @@ import sys
 import time
 import datetime
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 try:
     from commands import *
     from commands.id9 import ID
+
     id = ID()
 except ImportError:
     import os
+
     os.system("pip install git+https://github.com/egigoka/commands")
 try:
     import todoist
 except ImportError:
     from commands.pip9 import Pip
+
     Pip.install("todoist-python")
     import todoist
 try:
     import pytz
 except ImportError:
     from commands.pip9 import Pip
+
     Pip.install("pytz")
     import pytz
 try:
     import tzlocal
 except ImportError:
     from commands.pip9 import Pip
+
     Pip.install("tzlocal")
     import tzlocal
 
@@ -120,16 +125,14 @@ class Todoist:
         return new_project
 
     def project_raw_items(self, name):
-        if self.project_exists(name):
-            project_data = self.api.projects.get_data(self.project_exists(name))
-            try:
-                items = project_data["items"]
-            except KeyError:
-                if project_data['error_tag'] == 'PROJECT_NOT_FOUND':
-                    return []
-            return items
-        else:
+        project_id = self.project_exists(name)
+        if not project_id:
             raise KeyError(f"Project {name} doesn't exist!")
+        items = self.api.projects.get_data(project_id)
+        if items:
+            return items
+        return []
+
 
     def project_items_names(self, name):
         raw = self.project_raw_items(name)
@@ -155,6 +158,7 @@ class Todoist:
         cnt_incomplete_tasks = 0
         items = self.project_raw_items(project_name)
         for item in items:
+            status = self.item_status(item)
             if status in ["today", "overdue"]:
                 cnt_incomplete_tasks += 1
         return cnt_incomplete_tasks
@@ -190,7 +194,8 @@ class Todoist:
             project_id = self.project_exists(name)
         return project_id
 
-    def add_item(self, name, project_name, item_order, day_order, priority=Priority.USUAL, date_string=None, due_date_utc=None, auto_create_project=False):
+    def add_item(self, name, project_name, item_order, day_order, priority=Priority.USUAL, date_string=None,
+                 due_date_utc=None, auto_create_project=False):
         project_id = self.project_exists(project_name)
         if auto_create_project:
             project_id = self.create_project(project_name)
@@ -244,15 +249,15 @@ class Todoist:
         else:
             now = datetime.datetime.now()
             try:
-            #if item_obj['due_date_utc']:
+                # if item_obj['due_date_utc']:
                 todo_time = self.todoist_time_to_datetime_datetime(item_obj['due']['date'])
             except KeyError as e:
                 Print.prettify(item_obj)
                 Print.colored("try to 'pip install --upgrade todoist-python'")
                 raise KeyError(e)
             except TypeError:
-                #Print.prettify(item_obj)
-                #print(id.get())
+                # Print.prettify(item_obj)
+                # print(id.get())
                 if State.debug:
                     print(item_obj["content"], item_obj["due"], "no date")
                 return "no date"
@@ -261,12 +266,12 @@ class Todoist:
             end_of_today = datetime.datetime(now.year,
                                              now.month,
                                              now.day,
-                                             23, 59, 59) # not used
+                                             23, 59, 59)  # not used
             now = datetime.datetime.now()
 
-            #end_of_today_aware = local_timezone.localize(now)
+            # end_of_today_aware = local_timezone.localize(now)
 
-            #todo_time_aware = utc_timezone.localize(todo_time)
+            # todo_time_aware = utc_timezone.localize(todo_time)
             # todo: update it to new api due item_obj["date"]["timezone"]
             # dirty hack:
             todo_time_aware = todo_time
@@ -286,7 +291,8 @@ class Todoist:
                 return "not today"
 
 
-encrypted_todoist_token = [-20, -20, -50, -14, -61, -54, 2, 0, 32, 27, -51, -21, -54, -53, 4, 3, 29, -14, -51, 29, -10, -6, 1, 4, 28,
+encrypted_todoist_token = [-20, -20, -50, -14, -61, -54, 2, 0, 32, 27, -51, -21, -54, -53, 4, 3, 29, -14, -51, 29, -10,
+                           -6, 1, 4, 28,
                            29, -55, -17, -59, -9, 2, 50, -13, -14, -52, -15, -56, -59, -44, 5]  # yes, that shitty
 
 
@@ -306,13 +312,14 @@ except (NameError, KeyError):
 todoist_password_for_api_key = password
 todoist_api_key = Str.decrypt(encrypted_todoist_token, todoist_password_for_api_key)
 
+
 def main():
     todo = Todoist(todoist_api_key)
     if Arguments.apikey:
         print(f"API key: {todoist_api_key}")
 
     if Arguments.name:
-        print("@"+todo.api.state["user"]["full_name"])
+        print("@" + todo.api.state["user"]["full_name"])
 
     if Arguments.list:
         projects = todo.projects_all_names()
@@ -321,12 +328,12 @@ def main():
             Print(project_name, len(items), "items")
             for item in items:
                 status = todo.item_status(item)
-                status_colors = {"deleted":'magenta', "overdue":'red', "today":'yellow', "not today": 'green'}
+                status_colors = {"deleted": 'magenta', "overdue": 'red', "today": 'yellow', "not today": 'green'}
                 status_color = status_colors[status]
                 if Arguments.listnogreen:
                     if status_color == "green":
                         continue  # skip green items
-                Print.colored(" "*3, item['content'], status_color)
+                Print.colored(" " * 3, item['content'], status_color)
 
     # if Arguments.work:
     #     items = ['Wash the clothes - Shower room - 1 week', 'Clean out the tables - Kitchen - 2 days',
@@ -377,10 +384,10 @@ def main():
             cnt_skipped_items = 0
             for item in project_items:
                 for showed_item in State.showed_random_items:
-                    #Print.debug(f'{showed_item["project"]} == {project_name} {showed_item["project"] == project_name}')
+                    # Print.debug(f'{showed_item["project"]} == {project_name} {showed_item["project"] == project_name}')
                     if showed_item["project"] == project_name:
                         # print("True")
-                        #Print.debug(f'showed_item["id"] {showed_item["id"]} item["id"] {item["id"]} {showed_item["name"]} {item["content"]}')
+                        # Print.debug(f'showed_item["id"] {showed_item["id"]} item["id"] {item["id"]} {showed_item["name"]} {item["content"]}')
                         # Print.debug(f'{showed_item["id"]} == {item["id"]} {showed_item["id"] == item["id"]}')
                         if showed_item["id"] == item["id"]:
                             # Print("TRUE")
@@ -406,8 +413,10 @@ def main():
         Print.rewrite()
         Print.prettify(State.showed_random_items)
 
-        cnt_completed_tasks = cnt_all_tasks-cnt_incomplete_tasks
-        Print.colored(f"Unfinished tasks: {cnt_incomplete_tasks} of {cnt_all_tasks} total - {int((cnt_completed_tasks/cnt_all_tasks)*100)}% done", highlight, "blue")
+        cnt_completed_tasks = cnt_all_tasks - cnt_incomplete_tasks
+        Print.colored(
+            f"Unfinished tasks: {cnt_incomplete_tasks} of {cnt_all_tasks} total - {int((cnt_completed_tasks/cnt_all_tasks)*100)}% done",
+            highlight, "blue")
 
         time_string = ""
         if random_item["due_date_utc"]:
@@ -416,11 +425,12 @@ def main():
 
         Print.colored(f"Random todo: {random_item['content']} <{random_project_name}> {time_string}", "cyan")
 
-        Print.colored(f"State.loop_input = {State.loop_input} <{State.loop_input != 'n'}>, len(State.showed_random_items) = {len(State.showed_random_items)}", "red")
+        Print.colored(
+            f"State.loop_input = {State.loop_input} <{State.loop_input != 'n'}>, len(State.showed_random_items) = {len(State.showed_random_items)}",
+            "red")
 
-        State.showed_random_items.append({"project":random_project_name, "id":random_item["id"], "name":random_item["content"]})
-
-
+        State.showed_random_items.append(
+            {"project": random_project_name, "id": random_item["id"], "name": random_item["content"]})
 
         todo.api.commit()
 
