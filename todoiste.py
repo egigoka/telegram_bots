@@ -5,7 +5,7 @@ import sys
 import time
 import datetime
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 try:
     from commands import *
@@ -128,7 +128,11 @@ class Todoist:
         project_id = self.project_exists(name)
         if not project_id:
             raise KeyError(f"Project {name} doesn't exist!")
-        items = self.api.projects.get_data(project_id)
+        project_data = self.api.projects.get_data(project_id)
+        try:
+            items = project_data["items"]
+        except TypeError:  # why? wtf?
+            items = project_data
         if items:
             return items
         return []
