@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.6.1"
+__version__ = "1.6.9"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -31,7 +31,6 @@ class State:
     def __init__(self):
         f = Path.safe__file__(os.path.split(__file__)[0])
         json_path = Path.combine(f, "configs", "telegram_bot_todoist.json")
-        print(json_path)
         self.config_json = Json(json_path)
 
         self.first_message = True
@@ -86,7 +85,6 @@ class State:
         self.updating = False
 
 
-
 State = State()
 
 
@@ -97,39 +95,47 @@ encrypted_telegram_token = [-15, -21, -49, -16, -63, -52, -46, 6, -20, -13, -40,
 telegram_token = Str.decrypt(encrypted_telegram_token, todoist_password_for_api_key)
 
 
-def get_random_todo(todo_api):
-    print(Time.dotted())
+def get_random_todo(todo_api, telegram_api, chat_id):
     Print.rewrite("Getting random todo")
-    bench = Bench(prefix="Get random item in")
+    bench = Bench(prefix="Get random item in", quiet=False)
     bench.start()
     incomplete_items = todo_api.all_incomplete_items_in_account()
+    # Print.debug(Print.prettify(incomplete_items, quiet=True))
     bench.end()
 
-    State.counter_for_left_items_int = 0
-    State.counter_all_items = 0
+    counter_for_left_items_int = 0
+    counter_all_items = 0
+    all_todo_str = ""
 
-    State.all_todo_str = ""
     for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing excluded
-        State.counter_all_items += len(project_items)
+        counter_all_items += len(project_items)
+
         if project_name.strip() in State.excluded_projects:
             incomplete_items[project_name] = []
             continue
         if project_items:
-            # print(f'"{project_name}"')
-            State.all_todo_str += project_name + newline
+            print(f'"{project_name}"')
+            all_todo_str += project_name + newline
         for item in project_items.copy():
 
             if item["content"].strip() in State.excluded_items:
                 incomplete_items[project_name].remove(item)
-                # print(f'    "{item["content"]}" deleted')
+                print(f'    "{item["content"]}" excluded')
             else:
-                State.counter_for_left_items_int += 1
-                # print(f'    "{item["content"]}"')
-                State.all_todo_str += "    " + item["content"] + newline
+                counter_for_left_items_int += 1
+                print(f'    "{item["content"]}"')
+                all_todo_str += "    " + item["content"] + newline
 
     for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing empty projects
         if not project_items:
             incomplete_items.pop(project_name)
+
+    Print.debug("counter_for_left_items_int", counter_for_left_items_int,
+                "counter_all_items", counter_all_items)
+                #"all_todo_str", all_todo_str)
+    State.counter_for_left_items_int = counter_for_left_items_int
+    State.counter_all_items = counter_all_items
+    State.all_todo_str = all_todo_str
 
     try:
         random_project_name, random_project_items = Random.item(incomplete_items)
@@ -139,25 +145,25 @@ def get_random_todo(todo_api):
 
     try:
         if not random_item["due_date_utc"].endswith("20:59:59 +0000"):
-            time_string = random_item["date_string"]
+            time_string = " " + random_item["date_string"]
     except KeyError:
         time_string = ""
 
-    counter_for_left_items_str = ""
-    if State.counter_for_left_items:
+    if State.counter_for_left_items and telegram_api and chat_id:
         counter_for_left_items_str = f"({State.counter_for_left_items_int}/{State.counter_all_items} left)"
+        telegrame.send_message(telegram_api, chat_id, f"{counter_for_left_items_str} v{__version__}")
 
     Print.rewrite()
-    return f"{random_item['content']} <{random_project_name}> {time_string} {counter_for_left_items_str}".replace(
+    return f"{random_item['content']} <{random_project_name}>{time_string}".replace(
         ">  (", "> (")
 
 
-def todo_updater(todo_api):
+def todo_updater(todo_api, telegram_api, chat_id):
     if State.updating:
         Print("skip updating, thread already running")
         return
     State.updating = True
-    State.last_radnom_todo_str = get_random_todo(todo_api=todo_api)
+    State.last_radnom_todo_str = get_random_todo(todo_api=todo_api, telegram_api=telegram_api, chat_id=chat_id)
     State.updating = False
 
 
@@ -165,7 +171,7 @@ def start_todoist_bot():
     todoist_api = Todoist(todoist_api_key)
     telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 
-    todo_updater(todoist_api)  # initing for fist message
+    todo_updater(todoist_api, None, None)  # initing for fist message, no chat_id
 
     @telegram_api.message_handler(content_types=["text"])
     def reply_all_messages(message):
@@ -182,7 +188,7 @@ def start_todoist_bot():
                 markup.row(main_button)
                 markup.row(settings_button, list_button)
 
-                telegrame.send_message(telegram_api, message.chat.id, "init keyboard", reply_markup=markup)
+                # telegrame.send_message(telegram_api, message.chat.id, f"init keyboard {__version__}", reply_markup=markup)
 
                 last_message += 1
                 State.first_message = False
@@ -199,10 +205,10 @@ def start_todoist_bot():
             current_todo = State.last_radnom_todo_str
             telegrame.send_message(telegram_api, chat_id=message.chat.id,
                 #                               text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=markup)
-                                               text=current_todo)  # , reply_markup=markup)
+                                               text=current_todo, reply_markup=markup)
 
             State.last_todo_str = Str.substring(current_todo, "", "<").strip()
-            todo_updater_thread = MyThread(todo_updater, args=(todoist_api,), daemon=True, quiet=False)
+            todo_updater_thread = MyThread(todo_updater, args=(todoist_api, telegram_api, message.chat.id), daemon=True, quiet=False)
             todo_updater_thread.start()
 
         if message.chat.id != my_chat_id:
