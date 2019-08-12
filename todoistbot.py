@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.6.9"
+__version__ = "1.7.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -33,7 +33,6 @@ class State:
         json_path = Path.combine(f, "configs", "telegram_bot_todoist.json")
         self.config_json = Json(json_path)
 
-        self.first_message = True
         self.getting_project_name = False
         self.getting_item_name = False
 
@@ -85,6 +84,8 @@ class State:
         self.updating = False
 
 
+
+
 State = State()
 
 
@@ -97,7 +98,7 @@ telegram_token = Str.decrypt(encrypted_telegram_token, todoist_password_for_api_
 
 def get_random_todo(todo_api, telegram_api, chat_id):
     Print.rewrite("Getting random todo")
-    bench = Bench(prefix="Get random item in", quiet=False)
+    bench = Bench(prefix="Get random item in", quiet=True)
     bench.start()
     incomplete_items = todo_api.all_incomplete_items_in_account()
     # Print.debug(Print.prettify(incomplete_items, quiet=True))
@@ -114,25 +115,25 @@ def get_random_todo(todo_api, telegram_api, chat_id):
             incomplete_items[project_name] = []
             continue
         if project_items:
-            print(f'"{project_name}"')
+            # print(f'"{project_name}"')
             all_todo_str += project_name + newline
         for item in project_items.copy():
 
             if item["content"].strip() in State.excluded_items:
                 incomplete_items[project_name].remove(item)
-                print(f'    "{item["content"]}" excluded')
+                # print(f'    "{item["content"]}" excluded')
             else:
                 counter_for_left_items_int += 1
-                print(f'    "{item["content"]}"')
+                # print(f'    "{item["content"]}"')
                 all_todo_str += "    " + item["content"] + newline
 
     for project_name, project_items in Dict.iterable(incomplete_items.copy()):  # removing empty projects
         if not project_items:
             incomplete_items.pop(project_name)
 
-    Print.debug("counter_for_left_items_int", counter_for_left_items_int,
-                "counter_all_items", counter_all_items)
-                #"all_todo_str", all_todo_str)
+    #  Print.debug("counter_for_left_items_int", counter_for_left_items_int,
+    #              "counter_all_items", counter_all_items)
+    #              "all_todo_str", all_todo_str)
     State.counter_for_left_items_int = counter_for_left_items_int
     State.counter_all_items = counter_all_items
     State.all_todo_str = all_todo_str
@@ -176,22 +177,15 @@ def start_todoist_bot():
     @telegram_api.message_handler(content_types=["text"])
     def reply_all_messages(message):
 
-        def main_message(sended_messages_before=0):
-            last_message = message.message_id + State.sent_messages + sended_messages_before
+        def main_message():
             State.sent_messages = 1
 
-            if State.first_message:
-                markup = telebot.types.ReplyKeyboardMarkup()
-                main_button = telebot.types.KeyboardButton('MOAR!')
-                settings_button = telebot.types.KeyboardButton('Settings')
-                list_button = telebot.types.KeyboardButton('List')
-                markup.row(main_button)
-                markup.row(settings_button, list_button)
-
-                # telegrame.send_message(telegram_api, message.chat.id, f"init keyboard {__version__}", reply_markup=markup)
-
-                last_message += 1
-                State.first_message = False
+            main_markup = telebot.types.ReplyKeyboardMarkup()
+            main_button = telebot.types.KeyboardButton('MOAR!')
+            settings_button = telebot.types.KeyboardButton('Settings')
+            list_button = telebot.types.KeyboardButton('List')
+            main_markup.row(main_button)
+            main_markup.row(settings_button, list_button)
 
             if State.excluded_projects:
                 excluded_str = f"Excluded projects: {State.excluded_projects}."
@@ -204,8 +198,8 @@ def start_todoist_bot():
 
             current_todo = State.last_radnom_todo_str
             telegrame.send_message(telegram_api, chat_id=message.chat.id,
-                #                               text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=markup)
-                                               text=current_todo, reply_markup=markup)
+                                   #  text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=main_markup)
+                                   text=current_todo, reply_markup=main_markup)
 
             State.last_todo_str = Str.substring(current_todo, "", "<").strip()
             todo_updater_thread = MyThread(todo_updater, args=(todoist_api, telegram_api, message.chat.id), daemon=True, quiet=False)
@@ -225,7 +219,6 @@ def start_todoist_bot():
                 else:
                     State.excluded_projects.append(message_text)
             State.getting_project_name = False
-            State.first_message = True
             main_message()
 
         elif State.getting_item_name:
@@ -238,24 +231,21 @@ def start_todoist_bot():
                 else:
                     State.excluded_items.append(message_text)
             State.getting_item_name = False
-            State.first_message = True
+            State._message = True
             main_message()
 
-        elif message.text == "MOAR!" or State.first_message:  # MAIN MESSAGE
+        elif message.text == "MOAR!":  # MAIN MESSAGE
             main_message()
 
         elif message.text == "List":
-            if State.first_message:
-                get_random_todo(todoist_api)
+            if not State.all_todo_str:
+                get_random_todo(todoist_api, None, None)
             if State.all_todo_str:
                 telegrame.send_message(telegram_api, message.chat.id, State.all_todo_str)
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "Todo list for today is empty!")
-            main_message(1)
 
         elif message.text == "Settings":
-            State.first_message = False
-
             markup = telebot.types.ReplyKeyboardMarkup()
             project_exclude_button = telebot.types.KeyboardButton("Exclude project")
             project_include_button = telebot.types.KeyboardButton("Include project")
@@ -302,11 +292,10 @@ def start_todoist_bot():
                 State.getting_project_name = True
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "No excluded projects, skip...")
-                State.first_message = True
-                main_message(1)
+                main_message()
 
         elif message.text == "Exclude items":
-            # markup = telebot.types.ForceReply(selective=False) it doesn't show up default keyboard :(
+            # main_markup = telebot.types.ForceReply(selective=False) it doesn't show up default keyboard :(
 
             markup = telebot.types.ReplyKeyboardMarkup()
             default_items = False
@@ -345,13 +334,11 @@ def start_todoist_bot():
                 State.getting_item_name = True
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "No excluded items, skip...")
-                State.first_message = True
-                main_message(1)
+                main_message()
 
         elif message.text == "Clean black list":
             State.excluded_items.purge()
             State.excluded_projects.purge()
-            State.first_message = True
             main_message()
 
         elif message.text == "Toggle left items counter":
@@ -359,12 +346,10 @@ def start_todoist_bot():
                 State.counter_for_left_items = False
             else:
                 State.counter_for_left_items = True
-            State.first_message = True
             main_message()
 
         else:
             telegrame.send_message(telegram_api, message.chat.id, f"ERROR! <{message.text}>")
-            State.first_message = True
             State.sent_messages += 1
             main_message()
 
