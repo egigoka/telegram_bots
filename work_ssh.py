@@ -3,7 +3,7 @@
 import sys
 import os
 
-__version = "0.2.0"
+__version = "0.2.1"
 
 try:
     from commands import *
@@ -63,18 +63,18 @@ def start_ssh_bot():
             if message.text.lower().startswith("t "):
                 try:
                     State.timeout = Str.get_integers(message.text)[0]
-                    telegram_api.send_message(my_chat_id, f"set timeout to {State.timeout}")
+                    telegrame.send_message(telegram_api, my_chat_id, f"set timeout to {State.timeout}")
                 except IndexError:
-                    telegram_api.send_message(my_chat_id, f"Failed change timeout {State.timeout}")
+                    telegrame.send_message(telegram_api, my_chat_id, f"Failed change timeout {State.timeout}")
             elif message.text.lower().startswith("cd"):
                 try:
                     os.chdir(message.text[3:])
-                    telegram_api.send_message(my_chat_id, f"Dir changed to {Path.working()}")
+                    telegrame.send_message(telegram_api, my_chat_id, f"Dir changed to {Path.working()}")
                 except Exception as e:
-                    telegram_api.send_message(my_chat_id, str(e))
+                    telegrame.send_message(telegram_api, my_chat_id, str(e))
             else:
                 print(f"running {message.text}")
-                telegram_api.send_message(my_chat_id, f"running {message.text}")
+                telegrame.send_message(telegram_api, my_chat_id, f"running {message.text}")
                 # output, err = Console.get_output("ping 8.8.8.8", pureshell=True, return_merged=False, timeout=2,
                 # decoding="cp866", print_std=True)
                 try:
@@ -89,10 +89,10 @@ def start_ssh_bot():
                         if not output and not err:
                             output = "Done!"
                     except Exception as e:
-                        telegram_api.send_message(my_chat_id, str(e))
+                        telegrame.send_message(telegram_api, my_chat_id, str(e))
                         output, err = "", ""
                 except Exception as e:
-                    telegram_api.send_message(my_chat_id, str(e))
+                    telegrame.send_message(telegram_api, my_chat_id, str(e))
                     output, err = "", ""
                 if err:
                     output += newline + "ERROR:" + newline + err
@@ -102,9 +102,9 @@ def start_ssh_bot():
                     chunk = chunk.replace("{newline}", newline)
                     if not chunk:
                         chunk = "__nil__"
-                    telegram_api.send_message(my_chat_id, chunk)
+                    telegrame.send_message(telegram_api, my_chat_id, chunk)
         else:
-            telegram_api.send_message(message.chat.id, "ACCESS DENIED")
+            telegrame.send_message(telegram_api, message.chat.id, "ACCESS DENIED")
 
     telegram_api.polling()
 

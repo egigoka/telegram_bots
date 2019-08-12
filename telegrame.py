@@ -10,7 +10,7 @@ except ImportError:
     Pip.install("pytelegrambotapi")
     import telebot
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 def safe_start_bot(bot_func, skipped_exceptions=(requests.exceptions.ReadTimeout,
@@ -52,3 +52,15 @@ def send_photo(telegram_api, image_path, message):
         raise FileNotFoundError(f"File not exist: '{image_path}'")
     photo = open(image_path, 'rb')
     telegram_api.send_photo(message.chat.id, photo)
+
+
+def send_message(telegram_api_object, chat_id, text,
+                      disable_web_page_preview=None, reply_to_message_id=None, reply_markup=None,
+                      parse_mode=None, disable_notification=None):
+    texts = [text]
+    if len(text) > 4096:
+        texts = Str.split_every(text, 4096)
+    for text in texts:
+        telegram_api_object.send_message(chat_id=chat_id, text=text, disable_web_page_preview=disable_web_page_preview,
+                                         reply_to_message_id=reply_to_message_id, reply_markup=reply_markup,
+                                         parse_mode=parse_mode, disable_notification=disable_notification)

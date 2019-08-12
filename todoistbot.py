@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -182,7 +182,7 @@ def start_todoist_bot():
                 markup.row(main_button)
                 markup.row(settings_button, list_button)
 
-                telegram_api.send_message(message.chat.id, "init keyboard", reply_markup=markup)
+                telegrame.send_message(telegram_api, message.chat.id, "init keyboard", reply_markup=markup)
 
                 last_message += 1
                 State.first_message = False
@@ -197,7 +197,7 @@ def start_todoist_bot():
                 excluded_str += f"{newline}No excluded items."
 
             current_todo = State.last_radnom_todo_str
-            telegram_api.send_message(chat_id=message.chat.id,
+            telegrame.send_message(telegram_api, chat_id=message.chat.id,
                 #                               text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=markup)
                                                text=current_todo)  # , reply_markup=markup)
 
@@ -206,7 +206,7 @@ def start_todoist_bot():
             todo_updater_thread.start()
 
         if message.chat.id != my_chat_id:
-            telegram_api.send_message(message.chat.id, "ACCESS DENY!")
+            telegrame.send_message(telegram_api, message.chat.id, "ACCESS DENY!")
             return
 
         if State.getting_project_name:
@@ -242,9 +242,9 @@ def start_todoist_bot():
             if State.first_message:
                 get_random_todo(todoist_api)
             if State.all_todo_str:
-                telegram_api.send_message(message.chat.id, State.all_todo_str)
+                telegrame.send_message(telegram_api, message.chat.id, State.all_todo_str)
             else:
-                telegram_api.send_message(message.chat.id, "Todo list for today is empty!")
+                telegrame.send_message(telegram_api, message.chat.id, "Todo list for today is empty!")
             main_message(1)
 
         elif message.text == "Settings":
@@ -265,7 +265,7 @@ def start_todoist_bot():
             markup.row(clean_black_list_button)
             markup.row(counter_for_left_items_button)
 
-            telegram_api.send_message(message.chat.id, "Settings:", reply_markup=markup)
+            telegrame.send_message(telegram_api, message.chat.id, "Settings:", reply_markup=markup)
 
         elif message.text == "Exclude project":
             markup = telebot.types.ReplyKeyboardMarkup()
@@ -277,7 +277,7 @@ def start_todoist_bot():
             cancel_button = telebot.types.KeyboardButton("Cancel")
             markup.row(cancel_button)
 
-            telegram_api.send_message(message.chat.id, "Send me project name to exclude:", reply_markup=markup)
+            telegrame.send_message(telegram_api, message.chat.id, "Send me project name to exclude:", reply_markup=markup)
 
             State.getting_project_name = True
 
@@ -291,11 +291,11 @@ def start_todoist_bot():
                 cancel_button = telebot.types.KeyboardButton("Cancel")
                 markup.row(cancel_button)
 
-                telegram_api.send_message(message.chat.id, "Send me project name to include:", reply_markup=markup)
+                telegrame.send_message(telegram_api, message.chat.id, "Send me project name to include:", reply_markup=markup)
 
                 State.getting_project_name = True
             else:
-                telegram_api.send_message(message.chat.id, "No excluded projects, skip...")
+                telegrame.send_message(telegram_api, message.chat.id, "No excluded projects, skip...")
                 State.first_message = True
                 main_message(1)
 
@@ -320,7 +320,7 @@ def start_todoist_bot():
             cancel_button = telebot.types.KeyboardButton("Cancel")
             markup.row(cancel_button)
 
-            telegram_api.send_message(message.chat.id, "Send me item name:", reply_markup=markup)
+            telegrame.send_message(telegram_api, message.chat.id, "Send me item name:", reply_markup=markup)
 
             State.getting_item_name = True
 
@@ -334,11 +334,11 @@ def start_todoist_bot():
                 cancel_button = telebot.types.KeyboardButton("Cancel")
                 markup.row(cancel_button)
 
-                telegram_api.send_message(message.chat.id, "Send me item name:", reply_markup=markup)
+                telegrame.send_message(telegram_api, message.chat.id, "Send me item name:", reply_markup=markup)
 
                 State.getting_item_name = True
             else:
-                telegram_api.send_message(message.chat.id, "No excluded items, skip...")
+                telegrame.send_message(telegram_api, message.chat.id, "No excluded items, skip...")
                 State.first_message = True
                 main_message(1)
 
@@ -357,7 +357,7 @@ def start_todoist_bot():
             main_message()
 
         else:
-            telegram_api.send_message(message.chat.id, f"ERROR! <{message.text}>")
+            telegrame.send_message(telegram_api, message.chat.id, f"ERROR! <{message.text}>")
             State.first_message = True
             State.sent_messages += 1
             main_message()
@@ -372,8 +372,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-#if __name__ == '__main__':
-#        main()

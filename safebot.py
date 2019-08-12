@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.0.0"
+__version__ = "0.0.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -49,26 +49,26 @@ def _start_bot_reciever():
                 print(fr"input: {message.text}")
                 if message.text.lower().startswith("help"):
                     reply = "no help in here"
-                    message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
                 elif message.text.lower() == "привет!":
                     reply = "Ну что там у тебя?"
-                    message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
                 elif message.text.lower() == "пока":
                     reply = "Ну бывай"
-                    message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
                 elif message.text.lower() == "как твои?":
                     for obj in State.saved:
                         if File.exist(obj):
                             photo = open(obj, 'rb')
                             telegram_api.send_photo(message.chat.id, photo)
                         reply = "Ну бывай"
-                        message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                        message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
                 else:
                     reply = "Unknown command, enter 'help'"
-                    message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
             else:
                 reply = "Stickers doesn't supported"
-                message_obj = telegram_api.send_message(message.chat.id, reply, disable_notification=True)
+                message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
 
         else:
             telegram_api.forward_message(my_chat_id, message.chat.id, message.message_id,
