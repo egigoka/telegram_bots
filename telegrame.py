@@ -10,7 +10,7 @@ except ImportError:
     Pip.install("pytelegrambotapi")
     import telebot
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 
 def safe_start_bot(bot_func, skipped_exceptions=(requests.exceptions.ReadTimeout,
@@ -60,7 +60,14 @@ def send_message(telegram_api_object, chat_id, text,
     texts = [text]
     if len(text) > 4096:
         texts = Str.split_every(text, 4096)
+    output = []
     for text in texts:
-        telegram_api_object.send_message(chat_id=chat_id, text=text, disable_web_page_preview=disable_web_page_preview,
+        output.append(telegram_api_object.send_message(chat_id=chat_id, text=text, disable_web_page_preview=disable_web_page_preview,
                                          reply_to_message_id=reply_to_message_id, reply_markup=reply_markup,
-                                         parse_mode=parse_mode, disable_notification=disable_notification)
+                                         parse_mode=parse_mode, disable_notification=disable_notification))
+    if len(output) == 0:
+        return None
+    elif len(output) == 1:
+        return output[0]
+    else:
+        return output
