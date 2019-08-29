@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.9.1"
+__version__ = "0.9.2"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -174,9 +174,9 @@ def _start_taskplayer_bot_sender():
         minutes_left = minutes_all - minutes_passed
 
         if time_passed > State.current_task_time:
+            State.set_next_task()
             if State.current_task_message_id:
                 telegram_api.delete_message(my_chat_id, State.current_task_message_id)
-            State.set_next_task()
             State.current_task_started = False
             State.current_task_halted = True
             continue

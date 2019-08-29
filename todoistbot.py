@@ -81,7 +81,7 @@ class State:
         self.sent_messages = 1
 
         self.last_radnom_todo_str = "not inited"
-        self.updating = False
+        self.last_updated = 0
 
 
 
@@ -160,12 +160,11 @@ def get_random_todo(todo_api, telegram_api, chat_id):
 
 
 def todo_updater(todo_api, telegram_api, chat_id):
-    if State.updating:
+    if Time.delta(State.last_updated, Time.stamp()) < 3:
         Print("skip updating, thread already running")
         return
-    State.updating = True
     State.last_radnom_todo_str = get_random_todo(todo_api=todo_api, telegram_api=telegram_api, chat_id=chat_id)
-    State.updating = False
+    State.last_updated = Time.stamp()
 
 
 def start_todoist_bot():

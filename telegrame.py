@@ -55,16 +55,19 @@ def send_photo(telegram_api, image_path, message):
 
 
 def send_message(telegram_api_object, chat_id, text,
-                      disable_web_page_preview=None, reply_to_message_id=None, reply_markup=None,
-                      parse_mode=None, disable_notification=None):
-    texts = [text]
+                 disable_web_page_preview=None, reply_to_message_id=None, reply_markup=None,
+                 parse_mode=None, disable_notification=None):
+    if len(text) != 0:
+        texts = [text]
     if len(text) > 4096:
         texts = Str.split_every(text, 4096)
     output = []
     for text in texts:
-        output.append(telegram_api_object.send_message(chat_id=chat_id, text=text, disable_web_page_preview=disable_web_page_preview,
-                                         reply_to_message_id=reply_to_message_id, reply_markup=reply_markup,
-                                         parse_mode=parse_mode, disable_notification=disable_notification))
+        output.append(telegram_api_object.send_message(chat_id=chat_id, text=text,
+                                                       disable_web_page_preview=disable_web_page_preview,
+                                                       reply_to_message_id=reply_to_message_id,
+                                                       reply_markup=reply_markup, parse_mode=parse_mode,
+                                                       disable_notification=disable_notification))
     if len(output) == 0:
         return None
     elif len(output) == 1:
