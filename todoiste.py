@@ -98,7 +98,10 @@ class Todoist:
         Print.rewrite("Loading cache...")
         self.api = todoist.TodoistAPI(api_key)
         Print.rewrite("Syncing...")
-        self.api.sync()
+        try:
+            self.api.sync()
+        except OSError:
+            pass
         Print.rewrite("Synced")
 
     def is_synced(self):

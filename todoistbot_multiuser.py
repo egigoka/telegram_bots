@@ -17,7 +17,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.1.2"
+__version__ = "2.2.4"
 
 # change version
 if OS.hostname == "EGGG-HOST-2019":
@@ -36,6 +36,7 @@ if OS.hostname == "EGGG-HOST-2019":
     new_content = "\r\n".join(lines)
     File.write(filepath, new_content, mode="w")
 # end changing version
+
 
 class State:
     def __init__(self, chat_id):
@@ -93,11 +94,14 @@ class State:
 
         self.all_items = []
         self.last_updated_all_items = 0
+        self.all_items_updating = False
 
         self.todoist_api_key_password = None
         self.getting_api_key = False
         self.getting_api_key_password = False
         self.getting_api_reset_answer = False
+
+        self.probably_last_good_password_message_id = None
 
 
 
@@ -121,6 +125,15 @@ class Users:
             self.secrets.pop(str(chat_id))
         except KeyError:
             pass
+
+    def get_todoist_api_key_password(self, chat_id):
+        try:
+            return int(self.secrets[f"{chat_id}_pass_message_id"])
+        except (KeyError, ValueError):
+            return False
+
+    def set_todoist_api_key_password(self, chat_id, message_id):
+        self.secrets[f"{chat_id}_pass_message_id"] = str(message_id)
 
 
 Users = Users()
@@ -147,10 +160,17 @@ except (NameError, KeyError):
 telegram_token = Str.decrypt(encrypted_telegram_token, password)
 
 
-def get_all_items(state: State, todoist_api: Todoist):
-    if not state.all_items or Time.delta(state.last_updated_all_items, Time.stamp()) > 60:
+def get_all_items(state: State, todoist_api: Todoist, auto_run: bool = False):
+    timeout = 600 if auto_run else 60
+    if not state.all_items or Time.delta(state.last_updated_all_items, Time.stamp()) > timeout:
         state.last_updated_all_items = Time.stamp()
         state.all_items = todoist_api.all_incomplete_items_in_account()
+
+    if not auto_run and not state.all_items_updating:
+        auto_update_thread = MyThread(get_all_items, args=(state, todoist_api, False), daemon=True)
+        auto_update_thread.start()
+        State.all_items_updating = True
+
     return state.all_items
 
 
@@ -224,6 +244,8 @@ def todo_updater(state: State, todoist_api: Todoist, telegram_api: telebot.TeleB
     #     return
     state.last_random_todo_str = get_random_todo(state=state, todoist_api=todoist_api, telegram_api=telegram_api, chat_id=chat_id, cnt = cnt)
     state.last_updated = Time.stamp()
+    if state.probably_last_good_password_message_id and state.probably_last_good_password_message_id != Users.get_todoist_api_key_password(chat_id):
+        Users.set_todoist_api_key_password(chat_id, state.probably_last_good_password_message_id)
 
 
 def main_message(state: State, telegram_api: telebot.TeleBot, todoist_api: (Todoist,None), chat_id):
@@ -270,11 +292,10 @@ def check_connection_verbose(todoist_api: Todoist, telegram_api: telebot.TeleBot
     except AttributeError:
         pass
     markup = telebot.types.ReplyKeyboardMarkup()
-    key_button = telebot.types.KeyboardButton('Reset API key')
-    password_button = telebot.types.KeyboardButton('Reset API key password')
-    both_button = telebot.types.KeyboardButton('Reset BOTH')
-    markup.row(key_button, password_button)
-    markup.row(both_button)
+    key_button = telebot.types.KeyboardButton('Reset API key and password')
+    password_button = telebot.types.KeyboardButton('Reset password for API key')
+    markup.row(key_button)
+    markup.row(password_button)
 
     telegram_api.send_message(chat_id, f"Cannot sync with Todoist.\n"
                                        f"Do you want to change Todoist API key or password?", reply_markup=markup)
@@ -287,16 +308,40 @@ def start_todoist_bot(none_stop=True):
     def reply_all_messages(message):
         # init vars
         chat_id = message.chat.id
+        message_id = message.message_id
 
         # check State object
         if chat_id not in Users.state:
             Users.state[chat_id] = State(chat_id)
         CurrentState = Users.state[chat_id]
-        
+
+        if message.text == "Reset API key and password":
+            print("yeah")
+            # reset state
+            CurrentState.__init__(chat_id)
+            # delete api key
+            Users.delete_todoist_api_key_encrypted(chat_id)
+            # delete todoist obj
+            Users.todoist.pop(chat_id, None)
+            # get new todoist api key and password
+            telegram_api.send_message(chat_id, "API key and password reset, send new Todoist API password")
+            CurrentState.getting_api_key_password = True
+            return
+        elif message.text == "Reset password for API key":
+            # reset password
+            CurrentState.__init__(chat_id)
+            # delete todoist obj
+            Users.todoist.pop(chat_id, None)
+            # get new api password
+            telegram_api.send_message(chat_id, "API password key reset, send new password")
+            CurrentState.getting_api_key_password = True
+            return
+
         # getting init input
         if CurrentState.getting_api_key_password:
             CurrentState.todoist_api_key_password = message.text
             CurrentState.getting_api_key_password = False
+            CurrentState.probably_last_good_password_message_id = message_id
 
         if CurrentState.getting_api_key:
             api_key_encrypted = Str.encrypt(message.text.strip(), CurrentState.todoist_api_key_password)
@@ -313,8 +358,13 @@ def start_todoist_bot(none_stop=True):
         if chat_id not in Users.todoist:
             if not CurrentState.todoist_api_key_password:
                 telegram_api.send_message(chat_id, "Please, enter password to encrypt Todoist API Key.\n"
-                                                   "Remember it. For security reasons, I will not write it to disk,"
+                                                   "For security reasons, I will not write it to disk, "
                                                    "so after each update you need to re-send it.")
+                if Users.get_todoist_api_key_password(chat_id):
+                    try:
+                        telegram_api.forward_message(chat_id, chat_id, Users.get_todoist_api_key_password(chat_id))
+                    except Exception as e:
+                        print(e)
                 CurrentState.getting_api_key_password = True
                 return
             if not Users.get_todoist_api_key_encrypted(chat_id):
@@ -385,8 +435,8 @@ def start_todoist_bot(none_stop=True):
             clean_excluded_list_button = telebot.types.KeyboardButton("Clean excluded list")
             counter_for_remaining_items_button = telebot.types.KeyboardButton("Toggle remaining items counter")
 
-            reset_api_key_button = telebot.types.KeyboardButton("Reset API key")
-            reset_api_key_password_button = telebot.types.KeyboardButton("Reset API key password")
+            reset_api_key_button = telebot.types.KeyboardButton("Reset API key and password")
+            reset_api_key_password_button = telebot.types.KeyboardButton("Reset password for API key")
 
             markup.row(project_exclude_button, project_include_button)
             markup.row(items_exclude_button, items_include_button)
@@ -471,36 +521,6 @@ def start_todoist_bot(none_stop=True):
         elif message.text == "Toggle remaining items counter":
             CurrentState.counter_for_remaining_items = not CurrentState.counter_for_remaining_items
             main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
-        elif message.text == "Reset API key":
-            # reset state except password
-            pass_temp = CurrentState.todoist_api_key_password
-            CurrentState.__init__()
-            CurrentState.todoist_api_key_password = pass_temp
-            # delete api key
-            Users.delete_todoist_api_key_encrypted(chat_id)
-            # delete todoist obj
-            Users.todoist.pop(chat_id)
-            # get new todoist api
-            telegram_api.send_message(chat_id, "API key reset, send new Todoist API key")
-            CurrentState.getting_api_key = True
-        elif message.text == "Reset API key password":
-            # reset password
-            CurrentState.__init__()
-            # delete todoist obj
-            Users.todoist.pop(chat_id)
-            # get new api password
-            telegram_api.send_message(chat_id, "API password key reset, send new password")
-            CurrentState.getting_api_key_password = True
-        elif message.text == "Reset BOTH":
-            # reset state
-            CurrentState.__init__()
-            # delete api key
-            Users.delete_todoist_api_key_encrypted(chat_id)
-            # delete todoist obj
-            Users.todoist.pop(chat_id)
-            # get new todoist api key and password
-            telegram_api.send_message(chat_id, "API key and password reset, send new Todoist API password")
-            CurrentState.getting_api_key_password = True
         else:
             telegrame.send_message(telegram_api, message.chat.id, f"Unknown command '{message.text}'.\n"
             f"Please, enter one of commands: \n"
@@ -510,8 +530,8 @@ def start_todoist_bot(none_stop=True):
             f"'Include\Exclude project\items' to include or exclude tasks\n"
             f"'Clean excluded list' to include all tasks\n"
             f"'Toggle remaining items counter' to enable or disable sending counter of remaining items\n"
-            f"'Reset API key' - change API key for Todoist"
-            f"'Reset API key password' - change password to encrypt API key for Todoist")
+            f"'Reset API key and password' - change bot API key and password for it for Todoist"
+            f"'Reset password for API key' - change password to decrypt API key for Todoist (API key stays encrypted, change only if you entered wrong password)")
             main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
 
     telegram_api.polling(none_stop=none_stop)
