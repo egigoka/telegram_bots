@@ -101,6 +101,9 @@ class Todoist:
         self.api.sync()
         Print.rewrite("Synced")
 
+    def is_synced(self):
+        return bool(self.api.user.get('email'))  # get this method from todoist.api.__repr__
+
     def projects_all_names(self):
         names = {}
         for project in self.api.projects.all():
@@ -295,29 +298,9 @@ class Todoist:
                 return "not today"
 
 
-encrypted_todoist_token = [-20, -20, -50, -14, -61, -54, 2, 0, 32, 27, -51, -21, -54, -53, 4, 3, 29, -14, -51, 29, -10,
-                           -6, 1, 4, 28,
-                           29, -55, -17, -59, -9, 2, 50, -13, -14, -52, -15, -56, -59, -44, 5]  # yes, that shitty
-
-
-def reset_password():
-    password = Str.input_pass()
-    GIV["api_password"] = password
-    return password
-
-
-try:
-    password = GIV["api_password"]
-    if "reset" in sys.argv:
-        password = reset_password()
-except (NameError, KeyError):
-    password = reset_password()
-
-todoist_password_for_api_key = password
-todoist_api_key = Str.decrypt(encrypted_todoist_token, todoist_password_for_api_key)
-
 
 def main():
+    todoist_api_key = input("Enter Todoist API key:")
     todo = Todoist(todoist_api_key)
     if Arguments.apikey:
         print(f"API key: {todoist_api_key}")
@@ -340,20 +323,7 @@ def main():
                 Print.colored(" " * 3, item['content'], status_color)
 
     # if Arguments.work:
-    #     items = ['Wash the clothes - Shower room - 1 week', 'Clean out the tables - Kitchen - 2 days',
-    #              'Wash dishes - Kitchen - 1 day', 'Take out the trash - Kitchen - 1 day',
-    #              'Wash the stove - Kitchen - 1 day',
-    #              'Vacuum/sweep - Kitchen - 1 day', 'Wash the floor - Kitchen - 3 days', 'Clean out - Balcony - 3 days',
-    #              'Wash the floor - Balcony - 3 days', 'Clean up on the table - My room - 2 days',
-    #              'Clean out - My room - 2 days', 'Wipe dust - My room - 1 week','Fill the bed - My room - 1 day',
-    #              'Vacuum/sweep - My room - 1 day', 'Wash the floor - My room - 3 days',
-    #              'Wash shower - Shower room - 1 day', 'Wash the sink - Shower room - 1 day',
-    #              'Vacuum/sweep - Shower room - 1 day', 'Vacuum/sweep - Toilet - 1 day',
-    #              'Wash the floor - Shower room - 3 days', 'Wash the floor - Toilet - 3 days',
-    #              'Wash toilet - Toilet - 1 week', 'Wash and place shoes - Hallway - 2 days',
-    #              'Vacuum/sweep - Corridor - 1 day', 'Vacuum/sweep - Hallway - 1 day','Wash the floor - Corridor - 3 days',
-    #              'Wash the floor - Hallway - 3 days', 'Wash the sink - Kitchen - 3 days',
-    #              'Clothes to gather - Balcony - 1 week','Wipe in the wardrobe - Wardrobe - 3 days']
+    #     items = ['task 1 - project1 - 1 week', ]
     #
     #     cnt_order = 0
     #     for item in items:

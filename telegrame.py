@@ -57,10 +57,12 @@ def send_photo(telegram_api, image_path, message):
 def send_message(telegram_api_object, chat_id, text,
                  disable_web_page_preview=None, reply_to_message_id=None, reply_markup=None,
                  parse_mode=None, disable_notification=None):
-    if len(text) != 0:
+    if len(text) in Int.from_to(1, 4095):
         texts = [text]
-    if len(text) > 4096:
+    elif len(text) > 4096:
         texts = Str.split_every(text, 4096)
+    else:
+        texts = ["<empty message>"]
     output = []
     for text in texts:
         output.append(telegram_api_object.send_message(chat_id=chat_id, text=text,
@@ -69,8 +71,11 @@ def send_message(telegram_api_object, chat_id, text,
                                                        reply_markup=reply_markup, parse_mode=parse_mode,
                                                        disable_notification=disable_notification))
     if len(output) == 0:
-        return None
+        return []
     elif len(output) == 1:
-        return output[0]
+        return output
     else:
         return output
+
+def delete_message(telegram_api: telebot.TeleBot, chat_id, message_id):
+    return telegram_api.delete_message(chat_id, message_id)
