@@ -17,7 +17,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.1.0"
+__version__ = "2.1.2"
 
 # change version
 if OS.hostname == "EGGG-HOST-2019":
@@ -29,21 +29,18 @@ if OS.hostname == "EGGG-HOST-2019":
         if "__version__" in line:
             regexp = re.compile(r"(\d+)(?!.*\d)")
             last_ver = re.findall(r"(\d+)(?!.*\d)", line)
-            print(last_ver)
             replace = str(int(last_ver[0])+1)
             new = re.sub(r"(\d+)(?!.*\d)", replace, line)
-            print(new)
-            lines[cnt] = lines
+            lines[cnt] = new
             break
     new_content = "\r\n".join(lines)
     File.write(filepath, new_content, mode="w")
-    print(filepath)
 # end changing version
 
 class State:
     def __init__(self, chat_id):
         f = Path.safe__file__(os.path.split(__file__)[0])
-        json_path = Path.combine(f, "configs", f"telegram_bot_todoist_chat_id.json")
+        json_path = Path.combine(f, "configs", f"telegram_bot_todoist_{chat_id}.json")
         self.config_json = Json(json_path)
 
         self.getting_project_name = False
@@ -528,7 +525,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
