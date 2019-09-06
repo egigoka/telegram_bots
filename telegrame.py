@@ -47,11 +47,11 @@ def download_file(telegram_api, telegram_token, file_id, output_path):
         raise requests.HTTPError(f"Status: '{r.status_code}', address: '{address}'")
 
 
-def send_photo(telegram_api, image_path, message):
+def send_photo(telegram_api, image_path, chat_id):
     if not File.exist(image_path):
         raise FileNotFoundError(f"File not exist: '{image_path}'")
     photo = open(image_path, 'rb')
-    telegram_api.send_photo(message.chat.id, photo)
+    telegram_api.send_photo(chat_id, photo)
 
 
 def send_message(telegram_api_object, chat_id, text,

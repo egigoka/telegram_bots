@@ -17,7 +17,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.2.6"
+__version__ = "2.4.16"
 
 # change version
 if OS.hostname == "EGGG-HOST-2019":
@@ -36,7 +36,6 @@ if OS.hostname == "EGGG-HOST-2019":
     new_content = "\r\n".join(lines)
     File.write(filepath, new_content, mode="w")
 # end changing version
-
 
 class State:
     def __init__(self, chat_id):
@@ -65,6 +64,7 @@ class State:
                 return out
 
             def save(self):
+                self.json_object[self.category] = {}
                 self.json_object[self.category][self.property] = self
                 self.json_object.save()
 
@@ -82,7 +82,16 @@ class State:
         except KeyError:
             self.excluded_items = JsonList([], "excluded", "items", self.config_json)
 
-        self.counter_for_remaining_items = True
+        try:
+            self.emoji = self.config_json["emoji"]
+        except:
+            self.config_json["emoji"] = self.emoji = False
+
+        try:
+            self.counter_for_remaining_items = self.config_json["remaining cnt"]
+        except:
+            self.config_json["remaining cnt"] = self.counter_for_remaining_items = True
+
         self.counter_for_remaining_items_int = 0
 
         self.counter_all_items = 0
@@ -104,6 +113,37 @@ class State:
 
         self.probably_last_good_password_message_id = None
 
+        class TextEmoji:
+            reset_api_key_and_password = "🚮Reset API key and password🚮"
+            reset_password_for_api_key = "🖌Reset password for API key🖌"
+            cancel = "✖️Cancel✖️"
+            toggle_remaining_items_counter = "ℹ️Toggle remaining items counterℹ️"
+            clean_excluded_list = "🆓Clean excluded list🆓"
+            exclude_project = "❌Exclude project❌"
+            include_project = "✅Include project✅"
+            exclude_items = "❌Exclude items❌"
+            include_items = "✅Include items✅"
+            disable_emoji = "Disable Emoji"
+            enable_emoji = "😎Enable Emoji😎"
+
+        class TextNoEmoji:
+            reset_api_key_and_password = "Reset API key and password"
+            reset_password_for_api_key = "Reset password for API key"
+            cancel = "Cancel"
+            toggle_remaining_items_counter = "Toggle remaining items counter"
+            clean_excluded_list = "Clean excluded list"
+            exclude_project = "Exclude project"
+            include_project = "Include project"
+            exclude_items = "Exclude items"
+            include_items = "Include items"
+            disable_emoji = "Disable Emoji"
+            enable_emoji = "😎Enable Emoji😎"
+
+        self.TextEmoji = TextEmoji
+        self.TextNoEmoji = TextNoEmoji
+        if self.emoji:
+            self.Text = TextEmoji
+        self.Text = TextNoEmoji
 
 
 class Users:
@@ -316,8 +356,7 @@ def start_todoist_bot(none_stop=True):
             Users.state[chat_id] = State(chat_id)
         CurrentState = Users.state[chat_id]
 
-        if message.text == "Reset API key and password":
-            print("yeah")
+        if message.text == CurrentState.Text.reset_api_key_and_password:
             # reset state
             CurrentState.__init__(chat_id)
             # delete api key
@@ -325,16 +364,16 @@ def start_todoist_bot(none_stop=True):
             # delete todoist obj
             Users.todoist.pop(chat_id, None)
             # get new todoist api key and password
-            telegram_api.send_message(chat_id, "API key and password reset, send new Todoist API password")
+            telegram_api.send_message(chat_id, "API key and password reset, send new Todoist API password:")
             CurrentState.getting_api_key_password = True
             return
-        elif message.text == "Reset password for API key":
+        elif message.text == CurrentState.Text.reset_password_for_api_key:
             # reset password
             CurrentState.__init__(chat_id)
             # delete todoist obj
             Users.todoist.pop(chat_id, None)
             # get new api password
-            telegram_api.send_message(chat_id, "API password key reset, send new password")
+            telegram_api.send_message(chat_id, "API password key reset, send correct password:")
             CurrentState.getting_api_key_password = True
             return
 
@@ -393,7 +432,7 @@ def start_todoist_bot(none_stop=True):
 
         # main
         if CurrentState.getting_project_name:
-            if message.text == "Cancel":
+            if message.text == CurrentState.Text.cancel:
                 pass
             else:
                 message_text = message.text.strip()
@@ -404,7 +443,7 @@ def start_todoist_bot(none_stop=True):
             CurrentState.getting_project_name = False
             main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
         elif CurrentState.getting_item_name:
-            if message.text == "Cancel":
+            if message.text == CurrentState.Text.cancel:
                 pass
             else:
                 message_text = message.text.strip()
@@ -427,46 +466,52 @@ def start_todoist_bot(none_stop=True):
                 telegrame.send_message(telegram_api, message.chat.id, "Todo list for today is empty!")
         elif message.text == "Settings":
             markup = telebot.types.ReplyKeyboardMarkup()
-            project_exclude_button = telebot.types.KeyboardButton("Exclude project")
-            project_include_button = telebot.types.KeyboardButton("Include project")
+            project_exclude_button = telebot.types.KeyboardButton(CurrentState.Text.exclude_project)
+            project_include_button = telebot.types.KeyboardButton(CurrentState.Text.include_project)
 
-            items_exclude_button = telebot.types.KeyboardButton("Exclude items")
-            items_include_button = telebot.types.KeyboardButton("Include items")
+            items_exclude_button = telebot.types.KeyboardButton(CurrentState.Text.exclude_items)
+            items_include_button = telebot.types.KeyboardButton(CurrentState.Text.include_items)
 
-            clean_excluded_list_button = telebot.types.KeyboardButton("Clean excluded list")
-            counter_for_remaining_items_button = telebot.types.KeyboardButton("Toggle remaining items counter")
+            clean_excluded_list_button = telebot.types.KeyboardButton(CurrentState.Text.clean_excluded_list)
+            counter_for_remaining_items_button = telebot.types.KeyboardButton(CurrentState.Text.toggle_remaining_items_counter)
 
-            reset_api_key_button = telebot.types.KeyboardButton("Reset API key and password")
-            reset_api_key_password_button = telebot.types.KeyboardButton("Reset password for API key")
+            cancel_button = telebot.types.KeyboardButton(CurrentState.Text.cancel)
+
+            reset_api_key_button = telebot.types.KeyboardButton(CurrentState.Text.reset_api_key_and_password)
+            reset_api_key_password_button = telebot.types.KeyboardButton(CurrentState.Text.reset_password_for_api_key)
+
+            disable_emoji_button = telebot.types.KeyboardButton(CurrentState.Text.disable_emoji)
+            enable_emoji_button = telebot.types.KeyboardButton(CurrentState.Text.enable_emoji)
 
             markup.row(project_exclude_button, project_include_button)
             markup.row(items_exclude_button, items_include_button)
-            markup.row(clean_excluded_list_button)
-            markup.row(counter_for_remaining_items_button)
+            markup.row(clean_excluded_list_button, counter_for_remaining_items_button)
+            markup.row(cancel_button)
             markup.row(reset_api_key_button, reset_api_key_password_button)
+            markup.row(disable_emoji_button, enable_emoji_button)
 
             telegrame.send_message(telegram_api, message.chat.id, "Settings:", reply_markup=markup)
-        elif message.text == "Exclude project":
+        elif message.text == CurrentState.Text.exclude_project:
             markup = telebot.types.ReplyKeyboardMarkup()
             for project_name, project_id in Dict.iterable(CurrentTodoistApi.projects_all_names()):
                 if project_name not in CurrentState.excluded_projects:
                     project_button = telebot.types.KeyboardButton(project_name)
                     markup.row(project_button)
 
-            cancel_button = telebot.types.KeyboardButton("Cancel")
+            cancel_button = telebot.types.KeyboardButton(CurrentState.Text.cancel)
             markup.row(cancel_button)
 
             telegrame.send_message(telegram_api, message.chat.id, "Send me project name to exclude:", reply_markup=markup)
 
             CurrentState.getting_project_name = True
-        elif message.text == "Include project":
+        elif message.text == CurrentState.Text.include_project:
             if CurrentState.excluded_projects:
                 markup = telebot.types.ReplyKeyboardMarkup()
                 for project_name in CurrentState.excluded_projects:
                     project_button = telebot.types.KeyboardButton(project_name)
                     markup.row(project_button)
 
-                cancel_button = telebot.types.KeyboardButton("Cancel")
+                cancel_button = telebot.types.KeyboardButton(CurrentState.Text.cancel)
                 markup.row(cancel_button)
 
                 telegrame.send_message(telegram_api, message.chat.id, "Send me project name to include:", reply_markup=markup)
@@ -475,13 +520,13 @@ def start_todoist_bot(none_stop=True):
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "No excluded projects, skip...")
                 main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
-        elif message.text == "Exclude items":
+        elif message.text == CurrentState.Text.exclude_items:
             # main_markup = telebot.types.ForceReply(selective=False) it doesn't show up default keyboard :(
 
             markup = telebot.types.ReplyKeyboardMarkup()
             default_items = False
             default_items_list = [r"Vacuum/sweep", "Wash the floor"]
-            if CurrentState.last_todo_str:
+            if CurrentState.last_todo_str and CurrentState.last_todo_str not in default_items_list:
                 default_items_list.append(CurrentState.last_todo_str)
             for item_name in default_items_list:
                 if item_name not in CurrentState.excluded_items:
@@ -493,20 +538,20 @@ def start_todoist_bot(none_stop=True):
                 project_button = telebot.types.KeyboardButton("Enter item manually")
                 markup.row(project_button)
 
-            cancel_button = telebot.types.KeyboardButton("Cancel")
+            cancel_button = telebot.types.KeyboardButton(CurrentState.Text.cancel)
             markup.row(cancel_button)
 
             telegrame.send_message(telegram_api, message.chat.id, "Send me item name:", reply_markup=markup)
 
             CurrentState.getting_item_name = True
-        elif message.text == "Include items":
+        elif message.text == CurrentState.Text.include_items:
             if CurrentState.excluded_items:
                 markup = telebot.types.ReplyKeyboardMarkup()
                 for item_name in CurrentState.excluded_items:
                     project_button = telebot.types.KeyboardButton(item_name)
                     markup.row(project_button)
 
-                cancel_button = telebot.types.KeyboardButton("Cancel")
+                cancel_button = telebot.types.KeyboardButton(CurrentState.Text.cancel)
                 markup.row(cancel_button)
 
                 telegrame.send_message(telegram_api, message.chat.id, "Send me item name:", reply_markup=markup)
@@ -515,12 +560,69 @@ def start_todoist_bot(none_stop=True):
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "No excluded items, skip...")
                 main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
-        elif message.text == "Clean excluded list":
+        elif message.text == CurrentState.Text.clean_excluded_list:
             CurrentState.excluded_items.purge()
             CurrentState.excluded_projects.purge()
             main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
-        elif message.text == "Toggle remaining items counter":
+        elif message.text == CurrentState.Text.toggle_remaining_items_counter:
             CurrentState.counter_for_remaining_items = not CurrentState.counter_for_remaining_items
+            CurrentState.config_json["remaining_cnt"] = CurrentState.counter_for_remaining_items
+            CurrentState.config_json.save()
+            main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
+        elif message.text == CurrentState.Text.cancel:
+            main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
+        elif message.text == CurrentState.Text.enable_emoji:
+            CurrentState.Text = CurrentState.TextEmoji
+            CurrentState.config_json["emoji"] = True
+            CurrentState.config_json.save()
+            main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
+        elif message.text == CurrentState.Text.disable_emoji:
+            CurrentState.Text = CurrentState.TextNoEmoji
+            CurrentState.config_json["emoji"] = False
+            CurrentState.config_json.save()
+            main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
+        elif message.text == "69":
+            gifs = ['https://media3.giphy.com/media/VTnKWKVuExtYc/giphy.gif',
+                    'https://media1.tenor.com/images/87433eeab910a8467cb23253fbed51ac/tenor.gif?itemid=4571547',
+                    'https://i.makeagif.com/media/2-22-2015/3wrPKL.gif',
+                    'https://thumbs.gfycat.com/ComplexUnsteadyChinesecrocodilelizard-size_restricted.gif',
+                    'https://i.kym-cdn.com/photos/images/original/000/967/326/252.gif',
+                    'https://thumbs.gfycat.com/GratefulBriefIberianbarbel-size_restricted.gif',
+                    'https://media1.tenor.com/images/3738b88b7d2883f046c7f7cf1cf44d12/tenor.gif?itemid=5963604',
+                    'http://www.gifimagesdownload.com/wp-content/uploads/2016/02/free-noice-gif-666-1.gif',
+                    'https://media.giphy.com/media/3oEdv6KUnfOnIDmUcU/giphy.gif',
+                    'https://i.makeagif.com/media/3-17-2015/h1Qm8Z.gif',
+                    'http://www.gifimagesdownload.com/wp-content/uploads/2016/02/cool-noice-gif-484-1.gif',
+                    'https://thumbs.gfycat.com/TemptingGaseousGarpike-size_restricted.gif',
+                    'https://i.imgflip.com/k8p3a.gif',
+                    'http://i.cubeupload.com/2lXIYI.gif',
+                    'https://i.kym-cdn.com/photos/images/list/000/922/397/e39.gif',
+                    'http://68.media.tumblr.com/18c85a433e657241db5e6fe44f16aac9/tumblr_inline_njzowqhntg1sqilv2.gif',
+                    'https://media.giphy.com/media/yJFeycRK2DB4c/giphy.gif',
+                    'https://thumbs.gfycat.com/AnimatedPoorDuckbillcat-max-1mb.gif',
+                    'https://memebomb.net/wp-content/uploads/2019/03/nice-memes-sandboarding-.gif',
+                    'https://thumbs.gfycat.com/BareRealLarva-small.gif',
+                    'https://i.gifer.com/Es2m.gif',
+                    'https://media3.giphy.com/media/gRRy5PkDTK4OQ/giphy.gif',
+                    'https://i.ytimg.com/vi/a8c5wmeOL9o/maxresdefault.jpg',
+                    'https://orig00.deviantart.net/d03f/f/2015/349/e/6/noice__model__michael_rosen_edition__by_doctoroctoroc-d9k8m6z.gif',
+                    'http://33.media.tumblr.com/9550a2974ba353be964add2a6ce66504/tumblr_inline_njzoy7yiKJ1sqilv2.gif',
+                    'https://cdn.dopl3r.com/memes_files/noice-intensifies-M6GmQ.jpg',
+                    'https://gifimage.net/wp-content/uploads/2017/10/michael-rosen-nice-gif-8.gif',
+                    'https://media.tenor.com/images/d8a67b9408c210c7e93923c5e5baca05/tenor.gif'
+                    ]
+            random_gif = Random.item(gifs)
+            texts = ["Nice!", "Noice!", "It's time to stop!", "Catch them all!1", "Do you find _that_ one?",
+                     "Yeah!", "Nice", "NiCe!", "Nooice", "Pluck!", "Noiice"]
+            random_text = Random.item(texts)
+            try:
+                if random_gif.endswith(".jpg"):
+                    telegram_api.send_photo(chat_id, random_gif, caption=random_text)
+                else:
+                    telegram_api.send_video(chat_id, random_gif, caption=random_text)
+            except Exception as e:
+                print(e)
+                telegram_api.send_message(chat_id, "No gif for you! (just kidding, try again)")
             main_message(state=CurrentState, telegram_api=telegram_api, todoist_api=CurrentTodoistApi, chat_id=chat_id)
         else:
             telegrame.send_message(telegram_api, message.chat.id, f"Unknown command '{message.text}'.\n"
