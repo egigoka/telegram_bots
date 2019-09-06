@@ -17,7 +17,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.2.4"
+__version__ = "2.2.6"
 
 # change version
 if OS.hostname == "EGGG-HOST-2019":
@@ -48,10 +48,11 @@ class State:
         self.getting_item_name = False
 
         class JsonList(list):
-            def __init__(self, list_input, category, property):
+            def __init__(self, list_input, category, property, json_object):
                 list.__init__(self, list_input)
                 self.category = category
                 self.property = property
+                self.json_object = json_object
 
             def append(self, obj):
                 out = list.append(self, obj)
@@ -64,8 +65,8 @@ class State:
                 return out
 
             def save(self):
-                self.config_json[self.category][self.property] = self
-                self.config_json.save()
+                self.json_object[self.category][self.property] = self
+                self.json_object.save()
 
             def purge(self):
                 while self:
@@ -73,13 +74,13 @@ class State:
                 self.save()
 
         try:
-            self.excluded_projects = JsonList(self.config_json["excluded"]["projects"], "excluded", "projects")
+            self.excluded_projects = JsonList(self.config_json["excluded"]["projects"], "excluded", "projects", self.config_json)
         except KeyError:
-            self.excluded_projects = JsonList([], "excluded", "projects")
+            self.excluded_projects = JsonList([], "excluded", "projects", self.config_json)
         try:
-            self.excluded_items = JsonList(self.config_json["excluded"]["items"], "excluded", "items")
+            self.excluded_items = JsonList(self.config_json["excluded"]["items"], "excluded", "items", self.config_json)
         except KeyError:
-            self.excluded_items = JsonList([], "excluded", "items")
+            self.excluded_items = JsonList([], "excluded", "items", self.config_json)
 
         self.counter_for_remaining_items = True
         self.counter_for_remaining_items_int = 0
@@ -358,10 +359,10 @@ def start_todoist_bot(none_stop=True):
         if chat_id not in Users.todoist:
             if not CurrentState.todoist_api_key_password:
                 telegram_api.send_message(chat_id, "Please, enter password to encrypt Todoist API Key.\n"
-                                                   "For security reasons, I will not write it to disk, "
-                                                   "so after each update you need to re-send it.")
+                                                   "For security reasons, I will not write it to disk.")
                 if Users.get_todoist_api_key_password(chat_id):
                     try:
+                        telegram_api.send_message(chat_id, "Probably, message with last correct password:")
                         telegram_api.forward_message(chat_id, chat_id, Users.get_todoist_api_key_password(chat_id))
                     except Exception as e:
                         print(e)

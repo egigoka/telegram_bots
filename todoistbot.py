@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.7.1"
+__version__ = "1.8.0"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -93,8 +93,24 @@ encrypted_telegram_token = [-15, -21, -49, -16, -63, -52, -46, 6, -20, -13, -40,
                             -41, -24, 13, 4, 49, 44, -25, 18, 9, -18, -19, 72, -12, -26, -3, 3, -62, 3, 17, 4, 7, -3,
                             -33, -3, -12]
 
-telegram_token = Str.decrypt(encrypted_telegram_token, todoist_password_for_api_key)
+encrypted_todoist_token = [-20, -20, -50, -14, -61, -54, 2, 0, 32, 27, -51, -21, -54, -53, 4, 3, 29, -14, -51, 29, -10,
+                           -6, 1, 4, 28, 29, -55, -17, -59, -9, 2, 50, -13, -14, -52, -15, -56, -59, -44, 5]
 
+def reset_password():
+    password = Str.input_pass()
+    GIV["api_password"] = password
+    return password
+
+
+try:
+    password = GIV["api_password"]
+    if "reset" in sys.argv:
+        password = reset_password()
+except (NameError, KeyError):
+    password = reset_password()
+
+telegram_token = Str.decrypt(encrypted_telegram_token, password)
+todoist_api_key = Str.decrypt(encrypted_todoist_token, password)
 
 def get_random_todo(todo_api, telegram_api, chat_id):
     Print.rewrite("Getting random todo")
