@@ -17,7 +17,9 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.4.16"
+__version__ = "2.5.4"
+
+my_chat_id = 5328715
 
 # change version
 if OS.hostname == "EGGG-HOST-2019":
@@ -316,7 +318,7 @@ def main_message(state: State, telegram_api: telebot.TeleBot, todoist_api: (Todo
             telegrame.delete_message(telegram_api, chat_id, message.message_id)
 
     current_todo = state.last_random_todo_str
-    telegrame.send_message(telegram_api, chat_id=chat_id,
+    telegrame.send_message(telegram_api, chat_id=chat_id, disable_web_page_preview=True,
                            #  text=f"{excluded_str}{newline}{current_todo}")  # , reply_markup=main_markup)
                            text=current_todo, reply_markup=main_markup)
 
@@ -350,6 +352,11 @@ def start_todoist_bot(none_stop=True):
         # init vars
         chat_id = message.chat.id
         message_id = message.message_id
+        try:
+            print(chat_id, message_id, message.text)
+        except:
+            print(chat_id, message_id)
+
 
         # check State object
         if chat_id not in Users.state:
@@ -431,7 +438,17 @@ def start_todoist_bot(none_stop=True):
             return
 
         # main
-        if CurrentState.getting_project_name:
+        if message.text.startswith("[to all]") and chat_id == my_chat_id:
+            f = Path.safe__file__(__file__)
+            workdir = Path.combine(os.path.split(f)[0], "configs")
+            for file in Dir.list_of_files(workdir):
+                if file.startswith("telegram_bot_todoist_"):
+                    try:
+                        to_chat_id = Str.get_integers(file)[0]
+                        telegram_api.forward_message(to_chat_id, chat_id, message_id)
+                    except IndexError:
+                        pass
+        elif CurrentState.getting_project_name:
             if message.text == CurrentState.Text.cancel:
                 pass
             else:
@@ -461,7 +478,7 @@ def start_todoist_bot(none_stop=True):
             if not CurrentState.all_todo_str:
                 get_random_todo(state=CurrentState, todoist_api=CurrentTodoistApi, telegram_api=None, chat_id=None)
             if CurrentState.all_todo_str:
-                telegrame.send_message(telegram_api, message.chat.id, CurrentState.all_todo_str)
+                telegrame.send_message(telegram_api, message.chat.id, CurrentState.all_todo_str, disable_web_page_preview=True)
             else:
                 telegrame.send_message(telegram_api, message.chat.id, "Todo list for today is empty!")
         elif message.text == "Settings":
@@ -642,7 +659,6 @@ def start_todoist_bot(none_stop=True):
 
 
 def main():
-    start_todoist_bot(none_stop=False)
     telegrame.very_safe_start_bot(start_todoist_bot)
 
 
