@@ -17,7 +17,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.5.4"
+__version__ = "2.5.6"
 
 my_chat_id = 5328715
 

@@ -5,7 +5,7 @@ import sys
 import time
 import datetime
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 try:
     from commands import *
@@ -226,18 +226,29 @@ class Todoist:
     def date_string_today(self):
         return datetime.datetime.now().strftime("%d %b %Y")
 
-    def todoist_time_to_datetime_datetime(self, time_string):
+    def try_todoist_time_to_datetime_datetime(self, time_string, format):
         try:
-            datetime_object = datetime.datetime.strptime(time_string, "%a %d %b %Y %H:%M:%S +0000")
+            return datetime.datetime.strptime(time_string, format)
         except ValueError:
-            try:
-                datetime_object = datetime.datetime.strptime(time_string, "%d %b %Y %H:%M:%S +0000")
-            except ValueError:
-                try:
-                    datetime_object = datetime.datetime.strptime(time_string, "%Y-%m-%dT%H:%M:%S")
-                except ValueError:
-                    datetime_object = datetime.datetime.strptime(time_string, "%Y-%m-%d")
-        return datetime_object
+            return
+
+    def todoist_time_to_datetime_datetime(self, time_string):
+        formats = ["%a %d %b %Y %H:%M:%S +0000", "%d %b %Y %H:%M:%S +0000", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d",
+                   "%Y-%m-%dT%H:%M:%SZ"]
+        formats_today = ["T%H:%M:%SZ", "T%H:%M:%S", "%H:%M:%S", "%H:%M:%S +0000", " %H:%M:%S +0000"]
+        for format in formats:
+            out = self.try_todoist_time_to_datetime_datetime(time_string, format)
+            if out:
+                return out
+
+        for format in formats_today:
+            time_string_today = datetime.datetime.now().strftime("%Y-%m-%d")+time_string
+            format = "%Y-%m-%d"+format
+            out = self.try_todoist_time_to_datetime_datetime(time_string_today, format)
+            if out:
+                return out
+
+        raise ValueError(f"Time string '{time_string}' not known for formats {formats} and today formats {formats_today}")
 
     def item_status(self, item_obj):
         # Print.prettify(item_obj)
