@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.9.2"
+__version__ = "0.9.3"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -131,12 +131,12 @@ def _start_taskplayer_bot_reciever():
                 elif message.text.lower() == "skip":
                     reply = "Trying to skip task"
                     State.set_next_task()
-                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
                     State.current_task_message_id = message_obj.message_id
                 elif message.text.lower() == "start":
                     reply = "Trying to start task"
                     State.start_task()
-                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
                     State.current_task_message_id = message_obj.message_id
                 else:
                     reply = "Unknown command, enter 'help'"
@@ -160,7 +160,7 @@ def _start_taskplayer_bot_sender():
         # if State.current_task_halted:
         #     if not State.current_task_halted_hello_message:
         #         message_text = f"Waiting to 'start' task {State.current_task_name}"
-        #         message_obj = telegram_api_taskplayer.send_message(my_chat_id, message_text)
+        #         message_obj = telegram_api_taskplayer.send_message(my_chat_id, message_text)[0]
         #         State.current_task_message_id = message_obj.message_id
         #         State.current_task_halted_hello_message = True
         #     continue
@@ -183,7 +183,7 @@ def _start_taskplayer_bot_sender():
         if State.current_task_time >= 60:  # minutes mode
             if not State.current_task_started:
                 message_text = f"Task {State.current_task_name} started - {minutes_left} minutes"
-                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)
+                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)[0]
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
                 State.last_sent_mins = minutes_passed
@@ -196,7 +196,7 @@ def _start_taskplayer_bot_sender():
         else:  # seconds mode
             if not State.current_task_started:
                 message_text = f"Task {State.current_task_name} started - {seconds_left} seconds"
-                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)
+                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)[0]
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
                 State.last_sent_secs = seconds_passed
