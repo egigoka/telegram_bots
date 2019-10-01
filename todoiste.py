@@ -259,6 +259,9 @@ class Todoist:
                 return "deleted"
         except KeyError:
             pass
+        except TypeError:
+            print('TypeError todoiste.itemstatus item_obj["is_archived"]')
+            print(f"item_obj '{item_obj}'")
         if item_obj['is_deleted']:
             if State.debug:
                 print(item_obj["content"], item_obj["due"], "deleted")
