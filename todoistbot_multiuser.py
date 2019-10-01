@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import time
 try:
     from commands import *
 except ImportError:
@@ -17,7 +18,7 @@ except ImportError:
 from todoiste import Todoist
 import telegrame
 
-__version__ = "2.5.10"
+__version__ = "2.6.0"
 
 my_chat_id = 5328715
 
@@ -203,16 +204,24 @@ except (NameError, KeyError):
 telegram_token = Str.decrypt(encrypted_telegram_token, password)
 
 
-def get_all_items(state: State, todoist_api: Todoist, auto_run: bool = False):
-    timeout = 600 if auto_run else 60
+def update_all_items_daemon(state: State, todoist_api: Todoist):
+    while True:
+        time.sleep(600)
+        get_all_items(state=state, todoist_api=todoist_api)
+
+
+def get_all_items(state: State, todoist_api: Todoist):
+    timeout = 60
     if not state.all_items or Time.delta(state.last_updated_all_items, Time.stamp()) > timeout:
         state.last_updated_all_items = Time.stamp()
         state.all_items = todoist_api.all_incomplete_items_in_account()
 
-    if not auto_run and not state.all_items_updating:
-        auto_update_thread = MyThread(get_all_items, args=(state, todoist_api, False), daemon=True)
+    if not state.all_items_updating:
+        state.all_items_updating = True
+        auto_update_thread = MyThread(update_all_items_daemon,
+                                      kwargs={"state": state, "todoist_api": todoist_api},
+                                      daemon=True, quiet=False)
         auto_update_thread.start()
-        State.all_items_updating = True
 
     return state.all_items
 
