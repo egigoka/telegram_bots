@@ -5,7 +5,7 @@ import sys
 import time
 import datetime
 
-__version__ = "1.0.3"
+__version__ = "1.0.5"
 
 try:
     from commands import *
@@ -252,6 +252,10 @@ class Todoist:
 
     def item_status(self, item_obj):
         # Print.prettify(item_obj)
+        if not isinstance(item_obj, dict):
+            print('TypeError todoiste.itemstatus item_obj is not a dictionary. Temporary return "today"')
+            print(f"item_obj '{item_obj}'")
+            return "today"
         try:
             if item_obj["is_archived"]:
                 if State.debug:
@@ -259,9 +263,6 @@ class Todoist:
                 return "deleted"
         except KeyError:
             pass
-        except TypeError:
-            print('TypeError todoiste.itemstatus item_obj["is_archived"]')
-            print(f"item_obj '{item_obj}'")
         if item_obj['is_deleted']:
             if State.debug:
                 print(item_obj["content"], item_obj["due"], "deleted")
