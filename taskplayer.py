@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -45,7 +45,7 @@ telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 
 class State:
     def __init__(self):
-        self.task_dict = Json(Path.combine('.', "configs", "TaskPlayer.json"))
+        self.task_dict = JsonDict(Path.combine('.', "configs", "TaskPlayer.json"))
         if len(self.task_dict) == 0:
             self.task_dict["Work"] = 1800
             self.task_dict["Home"] = 1800
