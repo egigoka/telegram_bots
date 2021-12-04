@@ -11,12 +11,12 @@ try:
     import telebot
 except ImportError:
     from commands.pip9 import Pip
-    Pip.install("pytelegrambotapi")
+    os.system("pip install pytelegrambotapi")
     import telebot
 import time
 import telegrame
 
-__version__ = "0.9.4"
+__version__ = "0.9.5"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -26,10 +26,12 @@ encrypted_telegram_token_taskplayer = [-14, -18, -50, -16, -61, -56, -42, 1, -21
                                        50, 12, 50, -21, -58, -17, 36, 29, -14, -60, 41, -27, -56, -7, 58, 41, 31, -56,
                                        33, -12, 12, -19, 48, 42, 4, 8, 47, -34]
 
+
 def reset_password():
     password = Str.input_pass()
     GIV["api_password"] = password
     return password
+
 
 try:
     password = GIV["api_password"]
@@ -60,7 +62,6 @@ class State:
 
         self.last_sent_mins = 0
         self.last_sent_secs = 0
-
 
     def set_task_by_int(self, integer):
         try:
@@ -99,19 +100,19 @@ class State:
 State = State()
 
 
-def _start_taskplayer_bot_reciever():
+def _start_task_player_bot_receiver():
     @telegram_api.message_handler(content_types=["text", 'sticker'])
     def reply_all_messages(message):
 
         if message.chat.id == my_chat_id:
             if message.text:
                 print(fr"input: {message.text}")
-                if message.text.lower().startswith("help"):
+                if message.text.lower().startswith("help")\
+                        or message.text.lower().startswith("/help"):
                     reply = "To set todos enter python dict with format like 'dict {'task1': 1800, 'task2': 3600}'" \
                             + newline
                     reply += "To skip task, enter 'skip'" + newline
                     reply += "To start next task enter 'start'" + newline
-
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
                     temp_dict = {}
@@ -128,18 +129,20 @@ def _start_taskplayer_bot_reciever():
                     else:
                         reply = f"Cannot set empty {temp_dict} list, return to {State.task_dict}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
-                elif message.text.lower() == "skip":
+                elif message.text.lower() == "skip"\
+                        or message.text.lower() == "/skip":
                     reply = "Trying to skip task"
                     State.set_next_task()
                     message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
                     State.current_task_message_id = message_obj.message_id
-                elif message.text.lower() == "start":
+                elif message.text.lower() == "start"\
+                        or message.text.lower() == "/start":
                     reply = "Trying to start task"
                     State.start_task()
                     message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
                     State.current_task_message_id = message_obj.message_id
                 else:
-                    reply = "Unknown command, enter 'help'"
+                    reply = "Unknown command, enter '/help'"
                     telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
             else:
                 reply = "Stickers doesn't supported"
@@ -214,7 +217,7 @@ def safe_threads_run():
 
     threads = Threading()
 
-    threads.add(telegrame.very_safe_start_bot, args=(_start_taskplayer_bot_reciever,), name="Reciever")
+    threads.add(telegrame.very_safe_start_bot, args=(_start_task_player_bot_receiver,), name="Reciever")
     threads.add(telegrame.very_safe_start_bot, args=(_start_taskplayer_bot_sender,), name="Sender")
 
     threads.start(wait_for_keyboard_interrupt=True)
