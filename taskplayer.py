@@ -16,7 +16,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -111,13 +111,13 @@ def _start_task_player_bot_receiver():
                         or message.text.lower().startswith("/help"):
                     reply = "To set todos enter python dict with format like 'dict {'task1': 1800, 'task2': 3600}'" \
                             + newline
-                    reply += "To skip task, enter 'skip'" + newline
-                    reply += "To start next task enter 'start'" + newline
+                    reply += "To skip task, enter '/skip'" + newline
+                    reply += "To start next task enter '/start'" + newline
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
                     temp_dict = {}
                     try:
-                        temp_dict = Dict.from_str(message.text)
+                        temp_dict = eval(message.text)
                     except (SyntaxError, TypeError, ValueError) as e:
                         print(e)
                         reply = f"Cannot change dict: {str(e)}"
