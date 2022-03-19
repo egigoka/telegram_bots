@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.10.18"
+__version__ = "0.10.19"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -86,6 +86,7 @@ class State:
 
     def reset_timer(self):
         self.current_task_timer.start()
+        self.pause_task_timer.start()
 
     def set_first_task(self):
         self.current_task_id.__init__()
@@ -93,7 +94,6 @@ class State:
         self.set_task_by_int(0)
         self.pause_task_timer_started = False
         self.pause_task_timer_time = 0
-
 
     def set_next_task(self):
         next_task_int = self.current_task_id.get()
@@ -174,8 +174,7 @@ def _start_task_player_bot_receiver():
                         or message.text.lower() == "/skip":
                     State.set_next_task()
                     telegram_api.delete_message(my_chat_id, message.id)
-                elif message.text.lower() == "start" \
-                        or message.text.lower() == "/start":
+                elif message.text.lower() == "/start":
                     State.start_task()
                 elif message.text.lower() == "pause" \
                         or message.text.lower() == "/pause":
