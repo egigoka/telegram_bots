@@ -1,22 +1,26 @@
 #! python3
 # -*- coding: utf-8 -*-
+import datetime
 import sys
+
 try:
     from commands import *
 except ImportError:
     import os
+
     os.system("pip install git+https://github.com/egigoka/commands")
     from commands import *
 try:
     import telebot
 except ImportError:
     from commands.pip9 import Pip
+
     os.system("pip install pytelegrambotapi")
     import telebot
 import time
 import telegrame
 
-__version__ = "0.9.6"
+__version__ = "0.10.18"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -54,14 +58,20 @@ class State:
         self.current_task_name = None
         self.current_task_timer = Bench(quiet=True)
         self.current_task_time = 0
+
+        self.pause_task_timer = Bench(quiet=True)
+        self.pause_task_timer_time = 0
+        self.pause_task_timer_started = False
+
         self.current_task_id = ID()
         self.current_task_started = False
         self.current_task_message_id = 0
-        self.current_task_halted = True
-        self.current_task_halted_hello_message = False
 
         self.last_sent_mins = 0
         self.last_sent_secs = 0
+
+        self.force_resend_message = False
+        self.last_message_obj = None
 
     def set_task_by_int(self, integer):
         try:
@@ -81,23 +91,53 @@ class State:
         self.current_task_id.__init__()
         assert self.current_task_id.get() == 0
         self.set_task_by_int(0)
+        self.pause_task_timer_started = False
+        self.pause_task_timer_time = 0
+
 
     def set_next_task(self):
         next_task_int = self.current_task_id.get()
         if not self.set_task_by_int(next_task_int):
             self.set_first_task()
+        self.pause_task_timer_started = False
+        self.pause_task_timer_time = 0
+        self.start_pause()
 
     def start_task(self):
-        self.current_task_halted = False
         self.reset_timer()
+        self.pause_task_timer_started = False
 
     def set_dict(self, dict_):
         self.task_dict.string = dict_
         self.task_dict.save()
         self.set_first_task()
+        self.pause_task_timer_started = False
+
+    def start_pause(self):
+        self.pause_task_timer.start()
+        self.pause_task_timer_started = True
+        self.force_resend_message = True
+
+    def resume_pause(self):
+        self.pause_task_timer_time += self.pause_task_timer.get()
+        self.pause_task_timer.start()
+        self.pause_task_timer_started = False
+        self.force_resend_message = True
+
+    def get_pause_timer(self):
+        if not self.pause_task_timer_started:
+            return self.pause_task_timer_time
+        else:
+            return self.pause_task_timer_time + self.pause_task_timer.get()
 
 
 State = State()
+
+
+def send_message_with_saving(*args, **kwargs):
+    message_obj = telegrame.send_message(*args, **kwargs)
+    State.last_message_obj = message_obj[0]
+    return message_obj
 
 
 def _start_task_player_bot_receiver():
@@ -107,12 +147,13 @@ def _start_task_player_bot_receiver():
         if message.chat.id == my_chat_id:
             if message.text:
                 print(fr"input: {message.text}")
-                if message.text.lower().startswith("help")\
+                if message.text.lower().startswith("help") \
                         or message.text.lower().startswith("/help"):
                     reply = "To set todos enter python dict with format like 'dict {'task1': 1800, 'task2': 3600}'" \
                             + newline
                     reply += "To skip task, enter '/skip'" + newline
                     reply += "To start next task enter '/start'" + newline
+                    telegram_api.delete_message(my_chat_id, message.id)
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
                     temp_dict = {}
@@ -129,46 +170,47 @@ def _start_task_player_bot_receiver():
                     else:
                         reply = f"Cannot set empty {temp_dict} list, return to {State.task_dict}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
-                elif message.text.lower() == "skip"\
+                elif message.text.lower() == "skip" \
                         or message.text.lower() == "/skip":
-                    reply = "Trying to skip task"
                     State.set_next_task()
-                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
-                    State.current_task_message_id = message_obj.message_id
-                elif message.text.lower() == "start"\
+                    telegram_api.delete_message(my_chat_id, message.id)
+                elif message.text.lower() == "start" \
                         or message.text.lower() == "/start":
-                    reply = "Trying to start task"
                     State.start_task()
-                    message_obj = telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)[0]
-                    State.current_task_message_id = message_obj.message_id
+                elif message.text.lower() == "pause" \
+                        or message.text.lower() == "/pause":
+                    State.start_pause()
+                    telegram_api.delete_message(my_chat_id, message.id)
+                elif message.text.lower() == "resume" \
+                        or message.text.lower():
+                    State.resume_pause()
+                    telegram_api.delete_message(my_chat_id, message.id)
                 else:
                     reply = "Unknown command, enter '/help'"
                     telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                    telegram_api.delete_message(my_chat_id, message.id)
             else:
                 reply = "Stickers doesn't supported"
                 telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                telegram_api.delete_message(my_chat_id, message.id)
 
         else:
             telegram_api.forward_message(my_chat_id, message.chat.id, message.message_id,
                                          disable_notification=True)
             Print.rewrite()
             print(f"from {message.chat.id}: {message.text}")
+
     telegram_api.polling(none_stop=True)
 
 
 def _start_taskplayer_bot_sender():
     while True:
-        time.sleep(0.2)
-
-        # if State.current_task_halted:
-        #     if not State.current_task_halted_hello_message:
-        #         message_text = f"Waiting to 'start' task {State.current_task_name}"
-        #         message_obj = telegram_api_taskplayer.send_message(my_chat_id, message_text)[0]
-        #         State.current_task_message_id = message_obj.message_id
-        #         State.current_task_halted_hello_message = True
-        #     continue
+        time.sleep(0.5)
 
         time_passed = State.current_task_timer.get()
+        time_paused = State.get_pause_timer()
+        time_passed -= time_paused
+        Print(f"{time_passed=:.2f} {time_paused=:.2f} {State.pause_task_timer_started=}")
         seconds_passed = int(time_passed / 1)
         minutes_passed = int(time_passed / 60)
         seconds_all = int(State.current_task_time / 1)
@@ -181,12 +223,11 @@ def _start_taskplayer_bot_sender():
             if State.current_task_message_id:
                 telegram_api.delete_message(my_chat_id, State.current_task_message_id)
             State.current_task_started = False
-            State.current_task_halted = True
             continue
         if State.current_task_time >= 60:  # minutes mode
             if not State.current_task_started:
                 message_text = f"Task {State.current_task_name} started - {minutes_left} minutes"
-                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)[0]
+                message_obj = send_message_with_saving(telegram_api, my_chat_id, message_text)[0]
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
                 State.last_sent_mins = minutes_passed
@@ -194,6 +235,7 @@ def _start_taskplayer_bot_sender():
                 message_text = f"Current task is {State.current_task_name} {minutes_left} minutes left"
                 telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
                                                text=message_text)
+                State.last_message_obj.text = message_text
                 State.last_sent_mins = minutes_passed
 
         else:  # seconds mode
@@ -209,6 +251,20 @@ def _start_taskplayer_bot_sender():
                                                text=message_text)
                 State.last_sent_secs = seconds_passed
 
+        print(f"{State.force_resend_message=}")
+        if State.force_resend_message:
+            # message_obj = telegram_api.copy_message(my_chat_id, my_chat_id, State.current_task_message_id)
+            print(f"{State.current_task_message_id=}")
+            if State.current_task_message_id != 0:
+                telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+            # print(f"{State.last_message_obj.text}")
+            message_obj = telegrame.send_message(telegram_api, my_chat_id, State.last_message_obj.text
+                                                 + (" - paused"
+                                                    if State.pause_task_timer_started
+                                                    else ""))[0]
+            State.current_task_message_id = message_obj.message_id
+            State.force_resend_message = False
+
 
 def safe_threads_run():
     # https://www.tutorialspoint.com/python/python_multithreading.htm  # you can expand current implementation
@@ -217,8 +273,13 @@ def safe_threads_run():
 
     threads = Threading()
 
-    threads.add(telegrame.very_safe_start_bot, args=(_start_task_player_bot_receiver,), name="Reciever")
-    threads.add(telegrame.very_safe_start_bot, args=(_start_taskplayer_bot_sender,), name="Sender")
+    debug = False
+    if debug:
+        threads.add(_start_taskplayer_bot_sender, name="Sender")
+        threads.add(_start_task_player_bot_receiver, name="Receiver")
+    else:
+        threads.add(telegrame.very_safe_start_bot, args=(_start_task_player_bot_receiver,), name="Receiver")
+        threads.add(telegrame.very_safe_start_bot, args=(_start_taskplayer_bot_sender,), name="Sender")
 
     threads.start(wait_for_keyboard_interrupt=True)
 
