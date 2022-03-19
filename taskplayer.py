@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.10.19"
+__version__ = "0.11.0"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -134,6 +134,16 @@ class State:
 State = State()
 
 
+main_markup = telebot.types.ReplyKeyboardMarkup()
+main_button = telebot.types.KeyboardButton('Resume')
+settings_button = telebot.types.KeyboardButton('Pause')
+list_button = telebot.types.KeyboardButton('Help')
+skip_button = telebot.types.KeyboardButton('Skip')
+main_markup.row(main_button)
+main_markup.row(settings_button, list_button, skip_button)
+main_markup.row()
+
+
 def send_message_with_saving(*args, **kwargs):
     message_obj = telegrame.send_message(*args, **kwargs)
     State.last_message_obj = message_obj[0]
@@ -152,8 +162,11 @@ def _start_task_player_bot_receiver():
                     reply = "To set todos enter python dict with format like 'dict {'task1': 1800, 'task2': 3600}'" \
                             + newline
                     reply += "To skip task, enter '/skip'" + newline
-                    reply += "To start next task enter '/start'" + newline
+                    reply += "To start task enter '/resume'" + newline
+                    reply += "To pause task enter '/pause'" + newline
+                    buttons = ["", "", "", ""]
                     telegram_api.delete_message(my_chat_id, message.id)
+                    telegrame.send_message(telegram_api, my_chat_id, reply, reply_markup=main_markup)
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
                     temp_dict = {}
@@ -181,7 +194,7 @@ def _start_task_player_bot_receiver():
                     State.start_pause()
                     telegram_api.delete_message(my_chat_id, message.id)
                 elif message.text.lower() == "resume" \
-                        or message.text.lower():
+                        or message.text.lower() == "/resume":
                     State.resume_pause()
                     telegram_api.delete_message(my_chat_id, message.id)
                 else:
