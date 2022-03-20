@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.11.0"
+__version__ = "0.11.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -66,6 +66,7 @@ class State:
         self.current_task_id = ID()
         self.current_task_started = False
         self.current_task_message_id = 0
+        self.previous_task_message_id = 0
 
         self.last_sent_mins = 0
         self.last_sent_secs = 0
@@ -234,6 +235,10 @@ def _start_taskplayer_bot_sender():
             State.set_next_task()
             if State.current_task_message_id:
                 telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                State.current_task_started = 0
+            if State.previous_task_message_id:
+                telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                State.previous_task_message_id = 0
             State.current_task_started = False
             continue
         if State.current_task_time >= 60:  # minutes mode
@@ -267,13 +272,18 @@ def _start_taskplayer_bot_sender():
         if State.force_resend_message:
             # message_obj = telegram_api.copy_message(my_chat_id, my_chat_id, State.current_task_message_id)
             print(f"{State.current_task_message_id=}")
-            if State.current_task_message_id != 0:
+            if State.current_task_message_id:
                 telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                State.current_task_started = 0
+            if State.previous_task_message_id:
+                telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                State.previous_task_message_id = 0
             # print(f"{State.last_message_obj.text}")
             message_obj = telegrame.send_message(telegram_api, my_chat_id, State.last_message_obj.text
                                                  + (" - paused"
                                                     if State.pause_task_timer_started
                                                     else ""))[0]
+            State.previous_task_message_id = State.current_task_message_id
             State.current_task_message_id = message_obj.message_id
             State.force_resend_message = False
 
