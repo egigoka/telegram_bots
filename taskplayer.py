@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.11.2"
+__version__ = "0.12.0"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -51,19 +51,22 @@ telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 
 class State:
     def __init__(self):
+        self.state_json = JsonDict(Path.combine(".", "configs", "TaskPlayer_state.json"))
         self.task_dict = JsonDict(Path.combine('.', "configs", "TaskPlayer.json"))
         if len(self.task_dict) == 0:
             self.task_dict["Work"] = 1800
             self.task_dict["Home"] = 1800
-        self.current_task_name = None
-        self.current_task_timer = Bench(quiet=True)
-        self.current_task_time = 0
 
+        self.current_task_timer = Bench(quiet=True)
         self.pause_task_timer = Bench(quiet=True)
+        self.current_task_id = ID()
+        self.last_message_obj = None
+
+        self.current_task_name = None
+        self.current_task_time = 0
         self.pause_task_timer_time = 0
         self.pause_task_timer_started = False
 
-        self.current_task_id = ID()
         self.current_task_started = False
         self.current_task_message_id = 0
         self.previous_task_message_id = 0
@@ -72,7 +75,70 @@ class State:
         self.last_sent_secs = 0
 
         self.force_resend_message = False
-        self.last_message_obj = None
+
+        self.load_state()
+
+    def __setitem__(self, key, value):
+        if value is None:
+            value = "None"
+        if isinstance(value, str):
+            value = '"""' + value + '"""'
+        exec(f"self.{key} = {value}")
+
+    def __getitem__(self, item):
+        return eval(f"self.{item}")
+
+    def load_state(self):
+        for key, value in self.state_json.items():
+            if key in ["current_task_timer.time_start",
+                       "current_task_timer.time_end",
+                       "pause_task_timer.time_start",
+                       "pause_task_timer.time_end"]:
+                try:
+                    value = Time.timestamp_to_datetime(value)
+                except TypeError:
+                    pass
+            if key == "current_task_timer.time_start":
+                self.current_task_timer.time_start = value
+            elif key == "current_task_timer.time_end":
+                self.current_task_timer.time_end = value
+            elif key == "pause_task_timer.time_start":
+                self.pause_task_timer.time_start = value
+            elif key == "pause_task_timer.time_end":
+                self.pause_task_timer.time_end = value
+            else:
+                self[key] = value
+
+    def save_state(self):
+        for key in "current_task_name,current_task_time," \
+                   "pause_task_timer_time,pause_task_timer_started," \
+                   "current_task_started,current_task_message_id," \
+                   "previous_task_message_id,last_sent_mins," \
+                   "last_sent_secs,force_resend_message" \
+                   "".split(","):
+            self.state_json[key] = self[key]
+
+        if self.current_task_timer.time_start is None:
+            self.state_json["current_task_timer.time_start"] = None
+        else:
+            self.state_json["current_task_timer.time_start"] = \
+                Time.datetime_to_timestamp(self.current_task_timer.time_start)
+        if self.current_task_timer.time_end is None:
+            self.state_json["current_task_timer.time_end"] = None
+        else:
+            self.state_json["current_task_timer.time_end"] = \
+                Time.datetime_to_timestamp(self.current_task_timer.time_end)
+        if self.pause_task_timer is None:
+            self.state_json["pause_task_timer.time_start"] = None
+        else:
+            self.state_json["pause_task_timer.time_start"] = \
+                Time.datetime_to_timestamp(self.pause_task_timer.time_start)
+        if self.pause_task_timer.time_end is None:
+            self.state_json["pause_task_timer.time_end"] = None
+        else:
+            self.state_json["pause_task_timer.time_end"] = \
+                Time.datetime_to_timestamp(self.pause_task_timer.time_end)
+        self.state_json.save()
 
     def set_task_by_int(self, integer):
         try:
@@ -82,12 +148,14 @@ class State:
         self.current_task_name = task[0]
         self.current_task_time = task[1]
         self.current_task_timer.start()
-        State.current_task_started = False
+        self.current_task_started = False
+        self.save_state()
         return True
 
     def reset_timer(self):
         self.current_task_timer.start()
         self.pause_task_timer.start()
+        self.save_state()
 
     def set_first_task(self):
         self.current_task_id.__init__()
@@ -95,6 +163,7 @@ class State:
         self.set_task_by_int(0)
         self.pause_task_timer_started = False
         self.pause_task_timer_time = 0
+        self.save_state()
 
     def set_next_task(self):
         next_task_int = self.current_task_id.get()
@@ -103,27 +172,32 @@ class State:
         self.pause_task_timer_started = False
         self.pause_task_timer_time = 0
         self.start_pause()
+        self.save_state()
 
     def start_task(self):
         self.reset_timer()
         self.pause_task_timer_started = False
+        self.save_state()
 
     def set_dict(self, dict_):
         self.task_dict.string = dict_
         self.task_dict.save()
         self.set_first_task()
         self.pause_task_timer_started = False
+        self.save_state()
 
     def start_pause(self):
         self.pause_task_timer.start()
         self.pause_task_timer_started = True
         self.force_resend_message = True
+        self.save_state()
 
     def resume_pause(self):
         self.pause_task_timer_time += self.pause_task_timer.get()
         self.pause_task_timer.start()
         self.pause_task_timer_started = False
         self.force_resend_message = True
+        self.save_state()
 
     def get_pause_timer(self):
         if not self.pause_task_timer_started:
@@ -166,7 +240,10 @@ def _start_task_player_bot_receiver():
                     reply += "To start task enter '/resume'" + newline
                     reply += "To pause task enter '/pause'" + newline
                     buttons = ["", "", "", ""]
-                    telegram_api.delete_message(my_chat_id, message.id)
+                    try:
+                        telegram_api.delete_message(my_chat_id, message.id)
+                    except Exception:
+                        pass
                     telegrame.send_message(telegram_api, my_chat_id, reply, reply_markup=main_markup)
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
@@ -187,25 +264,40 @@ def _start_task_player_bot_receiver():
                 elif message.text.lower() == "skip" \
                         or message.text.lower() == "/skip":
                     State.set_next_task()
-                    telegram_api.delete_message(my_chat_id, message.id)
+                    try:
+                        telegram_api.delete_message(my_chat_id, message.id)
+                    except Exception:
+                        pass
                 elif message.text.lower() == "/start":
                     State.start_task()
                 elif message.text.lower() == "pause" \
                         or message.text.lower() == "/pause":
                     State.start_pause()
-                    telegram_api.delete_message(my_chat_id, message.id)
+                    try:
+                        telegram_api.delete_message(my_chat_id, message.id)
+                    except Exception:
+                        pass
                 elif message.text.lower() == "resume" \
                         or message.text.lower() == "/resume":
                     State.resume_pause()
-                    telegram_api.delete_message(my_chat_id, message.id)
+                    try:
+                        telegram_api.delete_message(my_chat_id, message.id)
+                    except Exception:
+                        pass
                 else:
                     reply = "Unknown command, enter '/help'"
                     telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
-                    telegram_api.delete_message(my_chat_id, message.id)
+                    try:
+                        telegram_api.delete_message(my_chat_id, message.id)
+                    except Exception:
+                        pass
             else:
                 reply = "Stickers doesn't supported"
                 telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
-                telegram_api.delete_message(my_chat_id, message.id)
+                try:
+                    telegram_api.delete_message(my_chat_id, message.id)
+                except Exception:
+                    pass
 
         else:
             telegram_api.forward_message(my_chat_id, message.chat.id, message.message_id,
@@ -237,10 +329,16 @@ def _start_taskplayer_bot_sender():
         if time_passed > State.current_task_time:
             State.set_next_task()
             if State.current_task_message_id:
-                telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                try:
+                    telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                except Exception:
+                    pass
                 State.current_task_started = 0
             if State.previous_task_message_id:
-                telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                try:
+                    telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                except Exception:
+                    pass
                 State.previous_task_message_id = 0
             State.current_task_started = False
             continue
@@ -253,9 +351,15 @@ def _start_taskplayer_bot_sender():
                 State.last_sent_mins = minutes_passed
             elif minutes_passed != State.last_sent_mins:
                 message_text = f"Current task is {State.current_task_name} {minutes_left} minutes left"
-                telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
-                                               text=message_text)
-                State.last_message_obj.text = message_text
+                try:
+                    telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
+                                                   text=message_text)
+                except Exception:
+                    pass
+                try:
+                    State.last_message_obj.text = message_text
+                except Exception:
+                    pass
                 State.last_sent_mins = minutes_passed
 
         else:  # seconds mode
@@ -267,8 +371,11 @@ def _start_taskplayer_bot_sender():
                 State.last_sent_secs = seconds_passed
             if seconds_passed != State.last_sent_secs:
                 message_text = f"Current task is {State.current_task_name} {seconds_left} seconds left"
-                telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
-                                               text=message_text)
+                try:
+                    telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
+                                                   text=message_text)
+                except Exception:
+                    pass
                 State.last_sent_secs = seconds_passed
 
         # print(f"{State.force_resend_message=}")
@@ -276,10 +383,16 @@ def _start_taskplayer_bot_sender():
             # message_obj = telegram_api.copy_message(my_chat_id, my_chat_id, State.current_task_message_id)
             print(f"{State.current_task_message_id=}")
             if State.current_task_message_id != 0:
-                telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                try:
+                    telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                except Exception:
+                    pass
                 State.current_task_message_id = 0
             if State.previous_task_message_id != 0:
-                telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                try:
+                    telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                except Exception:
+                    pass
                 State.previous_task_message_id = 0
             # print(f"{State.last_message_obj.text}")
             message_obj = telegrame.send_message(telegram_api, my_chat_id, State.last_message_obj.text
@@ -289,6 +402,7 @@ def _start_taskplayer_bot_sender():
             # State.previous_task_message_id = State.current_task_message_id
             State.current_task_message_id = message_obj.message_id
             State.force_resend_message = False
+        State.save_state()
         # print()
 
 
