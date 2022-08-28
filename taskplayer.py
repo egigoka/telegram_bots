@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.12.0"
+__version__ = "0.12.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -318,7 +318,7 @@ def _start_taskplayer_bot_sender():
         time_passed = State.current_task_timer.get()
         time_paused = State.get_pause_timer()
         time_passed -= time_paused
-        Print(f"{time_passed=:.2f} {time_paused=:.2f} {State.pause_task_timer_started=}")
+        # Print(f"{time_passed=:.2f} {time_paused=:.2f} {State.pause_task_timer_started=}")
         seconds_passed = int(time_passed / 1)
         minutes_passed = int(time_passed / 60)
         seconds_all = int(State.current_task_time / 1)
@@ -381,7 +381,7 @@ def _start_taskplayer_bot_sender():
         # print(f"{State.force_resend_message=}")
         if State.force_resend_message:
             # message_obj = telegram_api.copy_message(my_chat_id, my_chat_id, State.current_task_message_id)
-            print(f"{State.current_task_message_id=}")
+            # print(f"{State.current_task_message_id=}")
             if State.current_task_message_id != 0:
                 try:
                     telegram_api.delete_message(my_chat_id, State.current_task_message_id)
