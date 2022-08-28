@@ -20,7 +20,7 @@ except ImportError:
 import time
 import telegrame
 
-__version__ = "0.11.1"
+__version__ = "0.11.2"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -218,6 +218,9 @@ def _start_task_player_bot_receiver():
 
 def _start_taskplayer_bot_sender():
     while True:
+        # print(f"{State.current_task_message_id=}")
+        # print(f"{State.previous_task_message_id=}")
+
         time.sleep(0.5)
 
         time_passed = State.current_task_timer.get()
@@ -268,14 +271,14 @@ def _start_taskplayer_bot_sender():
                                                text=message_text)
                 State.last_sent_secs = seconds_passed
 
-        print(f"{State.force_resend_message=}")
+        # print(f"{State.force_resend_message=}")
         if State.force_resend_message:
             # message_obj = telegram_api.copy_message(my_chat_id, my_chat_id, State.current_task_message_id)
             print(f"{State.current_task_message_id=}")
-            if State.current_task_message_id:
+            if State.current_task_message_id != 0:
                 telegram_api.delete_message(my_chat_id, State.current_task_message_id)
-                State.current_task_started = 0
-            if State.previous_task_message_id:
+                State.current_task_message_id = 0
+            if State.previous_task_message_id != 0:
                 telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
                 State.previous_task_message_id = 0
             # print(f"{State.last_message_obj.text}")
@@ -283,9 +286,10 @@ def _start_taskplayer_bot_sender():
                                                  + (" - paused"
                                                     if State.pause_task_timer_started
                                                     else ""))[0]
-            State.previous_task_message_id = State.current_task_message_id
+            # State.previous_task_message_id = State.current_task_message_id
             State.current_task_message_id = message_obj.message_id
             State.force_resend_message = False
+        # print()
 
 
 def safe_threads_run():
