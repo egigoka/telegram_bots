@@ -208,7 +208,6 @@ class State:
 
 State = State()
 
-
 main_markup = telebot.types.ReplyKeyboardMarkup()
 main_button = telebot.types.KeyboardButton('Resume')
 settings_button = telebot.types.KeyboardButton('Pause')
@@ -242,9 +241,11 @@ def _start_task_player_bot_receiver():
                     buttons = ["", "", "", ""]
                     try:
                         telegram_api.delete_message(my_chat_id, message.id)
+                        print(f"1 deleted received {my_chat_id=} {message.id} {message.text}")
                     except Exception:
                         pass
                     telegrame.send_message(telegram_api, my_chat_id, reply, reply_markup=main_markup)
+                    print(f"2 sent {my_chat_id=} {reply=} {main_markup=}")
                 elif message.text.lower().startswith("dict "):
                     message.text = message.text[5:]
                     temp_dict = {}
@@ -254,6 +255,7 @@ def _start_task_player_bot_receiver():
                         print(e)
                         reply = f"Cannot change dict: {str(e)}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                        print(f"3 sent {message.chat.id=} {reply=} {True}")
                     if temp_dict:
                         if not Dict.isinstance_keys(temp_dict, str):
                             temp_dict = Dict.all_keys_lambda(temp_dict, str)
@@ -261,11 +263,13 @@ def _start_task_player_bot_receiver():
                     else:
                         reply = f"Cannot set empty {temp_dict} list, return to {State.task_dict}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                        print(f"4 sent {message.chat.id=} {reply=} {True}")
                 elif message.text.lower() == "skip" \
                         or message.text.lower() == "/skip":
                     State.set_next_task()
                     try:
                         telegram_api.delete_message(my_chat_id, message.id)
+                        print(f"5 deleted {my_chat_id=} {message.id=} {message.text=}")
                     except Exception:
                         pass
                 elif message.text.lower() == "/start":
@@ -275,6 +279,7 @@ def _start_task_player_bot_receiver():
                     State.start_pause()
                     try:
                         telegram_api.delete_message(my_chat_id, message.id)
+                        print(f"6 deleted {my_chat_id=} {message.id=} {message.text=}")
                     except Exception:
                         pass
                 elif message.text.lower() == "resume" \
@@ -282,26 +287,32 @@ def _start_task_player_bot_receiver():
                     State.resume_pause()
                     try:
                         telegram_api.delete_message(my_chat_id, message.id)
+                        print(f"7 deleted {my_chat_id=} {message.id=} {message.text=}")
                     except Exception:
                         pass
                 else:
                     reply = "Unknown command, enter '/help'"
                     telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                    print(f"8 sent {message.chat.id} {reply=} {True=}")
                     try:
                         telegram_api.delete_message(my_chat_id, message.id)
+                        print(f"9 deleted {my_chat_id} {message.id} {message.text}")
                     except Exception:
                         pass
             else:
                 reply = "Stickers doesn't supported"
                 telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
+                print(f"10 sent {message.chat.id=} {reply=} {True=}")
                 try:
                     telegram_api.delete_message(my_chat_id, message.id)
+                    print(f"11 deleted {my_chat_id=} {message.id=} {message.text=}")
                 except Exception:
                     pass
 
         else:
             telegram_api.forward_message(my_chat_id, message.chat.id, message.message_id,
                                          disable_notification=True)
+            print(f"12 forwarded {my_chat_id=} {message.chat.id=} {message.message_id=} {True=}")
             Print.rewrite()
             print(f"from {message.chat.id}: {message.text}")
 
@@ -331,12 +342,14 @@ def _start_taskplayer_bot_sender():
             if State.current_task_message_id:
                 try:
                     telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                    print(f"13 deleted {my_chat_id=} {State.current_task_message_id=}")
                 except Exception:
                     pass
                 State.current_task_started = 0
             if State.previous_task_message_id:
                 try:
                     telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                    print(f"14 deleted {my_chat_id=} {State.current_task_message_id=}")
                 except Exception:
                     pass
                 State.previous_task_message_id = 0
@@ -346,6 +359,7 @@ def _start_taskplayer_bot_sender():
             if not State.current_task_started:
                 message_text = f"Task {State.current_task_name} started - {minutes_left} minutes"
                 message_obj = send_message_with_saving(telegram_api, my_chat_id, message_text)[0]
+                print(f"15 sent {my_chat_id=} {message_text=}")
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
                 State.last_sent_mins = minutes_passed
@@ -354,6 +368,7 @@ def _start_taskplayer_bot_sender():
                 try:
                     telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
                                                    text=message_text)
+                    print(f"16 edited {my_chat_id=} {State.current_task_message_id=} {message_text=}")
                 except Exception:
                     pass
                 try:
@@ -365,7 +380,8 @@ def _start_taskplayer_bot_sender():
         else:  # seconds mode
             if not State.current_task_started:
                 message_text = f"Task {State.current_task_name} started - {seconds_left} seconds"
-                message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)[0]
+                message_obj = send_message_with_saving(telegram_api, my_chat_id, message_text)[0]
+                print(f"17 sent {my_chat_id=} {message_text=}")
                 State.current_task_message_id = message_obj.message_id
                 State.current_task_started = True
                 State.last_sent_secs = seconds_passed
@@ -374,6 +390,7 @@ def _start_taskplayer_bot_sender():
                 try:
                     telegram_api.edit_message_text(chat_id=my_chat_id, message_id=State.current_task_message_id,
                                                    text=message_text)
+                    print(f"18 modified {my_chat_id=}{State.current_task_message_id=}{message_text=}")
                 except Exception:
                     pass
                 State.last_sent_secs = seconds_passed
@@ -385,20 +402,26 @@ def _start_taskplayer_bot_sender():
             if State.current_task_message_id != 0:
                 try:
                     telegram_api.delete_message(my_chat_id, State.current_task_message_id)
+                    print(f"19 deleted {my_chat_id=} {State.current_task_message_id=}")
                 except Exception:
                     pass
                 State.current_task_message_id = 0
             if State.previous_task_message_id != 0:
                 try:
                     telegram_api.delete_message(my_chat_id, State.previous_task_message_id)
+                    print(f"20 deleted {my_chat_id=} {State.previous_task_message_id=}")
                 except Exception:
                     pass
                 State.previous_task_message_id = 0
             # print(f"{State.last_message_obj.text}")
-            message_obj = telegrame.send_message(telegram_api, my_chat_id, State.last_message_obj.text
-                                                 + (" - paused"
-                                                    if State.pause_task_timer_started
-                                                    else ""))[0]
+            # if State.last_message_obj is not None:
+            last_message_text = State.last_message_obj.text if State.last_message_obj is not None else ""
+            print(f"{State.last_message_obj=}")
+            message_text = last_message_text + (" - paused"
+                                                if State.pause_task_timer_started
+                                                else "")
+            message_obj = telegrame.send_message(telegram_api, my_chat_id, message_text)[0]
+            print(f"21 sent {my_chat_id=} {message_text=}")
             # State.previous_task_message_id = State.current_task_message_id
             State.current_task_message_id = message_obj.message_id
             State.force_resend_message = False
