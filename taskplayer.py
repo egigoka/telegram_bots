@@ -56,10 +56,10 @@ class State:
             self.task_dict["Work"] = 1800
             self.task_dict["Home"] = 1800
         self.current_task_name = None
-        self.current_task_timer = Bench(quiet=True)
+        self.current_task_timer = Bench(verbose=False)
         self.current_task_time = 0
 
-        self.pause_task_timer = Bench(quiet=True)
+        self.pause_task_timer = Bench(verbose=False)
         self.pause_task_timer_time = 0
         self.pause_task_timer_started = False
 
