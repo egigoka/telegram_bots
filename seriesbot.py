@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 my_chat_id = 5328715
 
@@ -107,8 +107,12 @@ def start_todoist_bot():
             send_main_message(message)
         else:
             filename = message.text.lower() + ".mp4"
-            File.create(Path.combine(State.series_path, filename))
-            telegrame.send_message(telegram_api, message.chat.id, f"Series '{filename}' added")
+            try:
+                File.create(Path.combine(State.series_path, filename))
+                message_send = f"Series '{filename}' added"
+            except FileExistsError:
+                message_send = f"Series '{filename}' already exists"
+            telegrame.send_message(telegram_api, message.chat.id, message_send)
 
     telegram_api.polling(none_stop=True)
     # https://github.com/eternnoir/pyTelegramBotAPI/issues/273
