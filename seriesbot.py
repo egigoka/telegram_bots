@@ -98,7 +98,7 @@ def start_todoist_bot():
             State.removing_mode = False
             filename = message.text.lower() + ".mp4"
             try:
-                File.remove(Path.combine(State.series_path, filename))
+                File.delete(Path.combine(State.series_path, filename))
                 message_send = f"Series '{filename}' removed"
             except FileNotFoundError:
                 message_send = f"Series '{filename}' not found"
