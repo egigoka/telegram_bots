@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 import os
 try:
-    from commands import *
+    from commands import Path
 except ImportError:
     import os
     os.system("pip install git+https://github.com/egigoka/commands")
-    from commands import *
+    from commands import Path
 try:
     import telebot
 except ImportError:
@@ -16,7 +16,7 @@ except ImportError:
 from todoiste import *
 import telegrame
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -112,6 +112,7 @@ except (NameError, KeyError):
 telegram_token = Str.decrypt(encrypted_telegram_token, password)
 todoist_api_key = Str.decrypt(encrypted_todoist_token, password)
 
+
 def get_random_todo(todo_api, telegram_api, chat_id):
     Print.rewrite("Getting random todo")
     bench = Bench(prefix="Get random item in", quiet=True)
@@ -163,6 +164,8 @@ def get_random_todo(todo_api, telegram_api, chat_id):
     try:
         if not random_item["due_date_utc"].endswith("20:59:59 +0000"):
             time_string = " " + random_item["date_string"]
+        else:
+            time_string = ""
     except KeyError:
         time_string = ""
 
