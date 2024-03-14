@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 my_chat_id = 5328715
 
@@ -87,6 +87,7 @@ def start_todoist_bot():
             for s in series:
                 if message.text.lower() in s.lower():
                     search_result.append(s)
+            search_result.sort()
             telegrame.send_message(telegram_api, message.chat.id, "\n".join(search_result))
         elif message.text == "/start":
             send_main_message(message)
