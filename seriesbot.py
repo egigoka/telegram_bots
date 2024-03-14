@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.0.5"
+__version__ = "0.1.0"
 
 my_chat_id = 5328715
 
@@ -28,6 +28,7 @@ class Arguments:
 class State:
     series_path = "/mnt/btr/Phones Sync/later"
     search_mode = False
+    removing_mode = False
 
 
 def reset_password():
@@ -41,8 +42,9 @@ def send_main_message(message):
     main_markup = telebot.types.ReplyKeyboardMarkup()
     get_random_button = telebot.types.KeyboardButton('Random')
     search_button = telebot.types.KeyboardButton('Search')
+    remove_keyboard_button = telebot.types.KeyboardButton('Remove')
     main_markup.row(get_random_button)
-    main_markup.row(search_button)
+    main_markup.row(search_button, remove_keyboard_button)
 
     telegrame.send_message(telegram_api, chat_id=message.chat.id,
                            text="Hello, darling", reply_markup=main_markup)
@@ -89,6 +91,18 @@ def start_todoist_bot():
                     search_result.append(s)
             search_result.sort()
             telegrame.send_message(telegram_api, message.chat.id, "\n".join(search_result))
+        elif message.text.lower() in ["remove", "delete"]:
+            State.removing_mode = True
+            telegrame.send_message(telegram_api, message.chat.id, "Enter name to remove")
+        elif State.removing_mode:
+            State.removing_mode = False
+            filename = message.text.lower() + ".mp4"
+            try:
+                File.remove(Path.combine(State.series_path, filename))
+                message_send = f"Series '{filename}' removed"
+            except FileNotFoundError:
+                message_send = f"Series '{filename}' not found"
+            telegrame.send_message(telegram_api, message.chat.id, message_send)
         elif message.text == "/start":
             send_main_message(message)
         else:
