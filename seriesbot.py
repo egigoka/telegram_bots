@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 my_chat_id = 5328715
 
@@ -91,7 +91,9 @@ def start_todoist_bot():
         elif message.text == "/start":
             send_main_message(message)
         else:
-            File.wipe(Path.combine(State.series_path, message.text.lower() + ".mp4"))
+            filename = message.text.lower() + ".mp4"
+            File.create(Path.combine(State.series_path, filename))
+            telegrame.send_message(telegram_api, message.chat.id, f"Series '{filename}' added")
 
     telegram_api.polling(none_stop=True)
     # https://github.com/eternnoir/pyTelegramBotAPI/issues/273
