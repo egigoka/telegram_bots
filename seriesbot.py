@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 my_chat_id = 5328715
 
@@ -97,10 +97,11 @@ def start_todoist_bot():
         elif State.removing_mode:
             State.removing_mode = False
             filename = message.text.lower() + ".mp4"
-            try:
-                File.delete(Path.combine(State.series_path, filename))
+            path = Path.combine(State.series_path, filename)
+            if File.exist(path):
+                File.delete(path)
                 message_send = f"Series '{filename}' removed"
-            except FileNotFoundError:
+            else:
                 message_send = f"Series '{filename}' not found"
             telegrame.send_message(telegram_api, message.chat.id, message_send)
         elif message.text == "/start":
