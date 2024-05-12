@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import sys
+import traceback
 
 try:
     from commands import *
@@ -13,14 +14,14 @@ except ImportError:
 try:
     import telebot
 except ImportError:
-    from commands.pip9 import Pip
-
+    import os
+    
     os.system("pip install pytelegrambotapi")
     import telebot
 import time
 import telegrame
 
-__version__ = "0.12.1"
+__version__ = "0.12.2"
 
 my_chat_id = 5328715
 ola_chat_id = 550959211
@@ -253,7 +254,8 @@ def _start_task_player_bot_receiver():
                         temp_dict = eval(message.text)
                     except (SyntaxError, TypeError, ValueError) as e:
                         print(e)
-                        reply = f"Cannot change dict: {str(e)}"
+                        stacktrace = traceback.format_exc()
+                        reply = f"Cannot change dict: {str(e)}{newline}{str(stacktrace)}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
                         print(f"3 sent {message.chat.id=} {reply=} {True}")
                     if temp_dict:
@@ -263,7 +265,7 @@ def _start_task_player_bot_receiver():
                     else:
                         reply = f"Cannot set empty {temp_dict} list, return to {State.task_dict}"
                         telegrame.send_message(telegram_api, message.chat.id, reply, disable_notification=True)
-                        print(f"4 sent {message.chat.id=} {reply=} {True}")
+                        print(f"4 sent {message.chat.id=} reply={reply} {True}")
                 elif message.text.lower() == "skip" \
                         or message.text.lower() == "/skip":
                     State.set_next_task()
