@@ -57,8 +57,8 @@ class State:
             self.task_dict["Work"] = 1800
             self.task_dict["Home"] = 1800
 
-        self.current_task_timer = Bench(quiet=True)
-        self.pause_task_timer = Bench(quiet=True)
+        self.current_task_timer = Bench(verbose=False)
+        self.pause_task_timer = Bench(verbose=False)
         self.current_task_id = ID()
         self.last_message_obj = None
 
