@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 my_chat_id = 5328715
 
@@ -90,6 +90,7 @@ def start_todoist_bot():
             telegrame.send_message(telegram_api, message.chat.id, "Enter search query")
         elif message.text.lower() == "all":
             series = get_series()
+            series.sort()
             telegrame.send_message(telegram_api, message.chat.id, newline.join(series))
         elif State.search_mode:
             State.search_mode = False
