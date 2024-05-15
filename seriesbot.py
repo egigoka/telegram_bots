@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 my_chat_id = 5328715
 
@@ -85,7 +85,7 @@ def start_todoist_bot():
             series = Dir.list_of_files(State.series_path)
             random_series = Random.item(series)
             telegrame.send_message(telegram_api, message.chat.id, random_series.replace(".mp4", ""))
-        elif message.text.lower() == "search":
+        elif message.text.lower() in ["search", "find"]:
             State.search_mode = True
             telegrame.send_message(telegram_api, message.chat.id, "Enter search query")
         elif message.text.lower() == "all":
@@ -106,7 +106,9 @@ def start_todoist_bot():
             telegrame.send_message(telegram_api, message.chat.id, "Enter name to remove")
         elif State.removing_mode:
             State.removing_mode = False
-            filename = message.text.lower() + ".mp4"
+            filename = message.text.lower()
+            filename = filename.replace("<space>", " ")
+            filename += ".mp4"
             path = Path.combine(State.series_path, filename)
             if File.exist(path):
                 File.delete(path)
