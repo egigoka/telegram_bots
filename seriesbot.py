@@ -3,7 +3,7 @@
 import os
 import sys
 try:
-    from commands import Path, Str, Dir, File, Random, Dict, GIV
+    from commands import Path, Str, Dir, File, Random, Dict, GIV, newline
 except ImportError:
     import os
     os.system("pip install git+https://github.com/egigoka/commands")
@@ -16,7 +16,7 @@ except ImportError:
     import telebot
 import telegrame
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 my_chat_id = 5328715
 
@@ -41,13 +41,19 @@ def reset_password():
 def send_main_message(message):
     main_markup = telebot.types.ReplyKeyboardMarkup()
     get_random_button = telebot.types.KeyboardButton('Random')
+    get_all = telebot.types.KeyboardButton('All')
     search_button = telebot.types.KeyboardButton('Search')
     remove_keyboard_button = telebot.types.KeyboardButton('Remove')
-    main_markup.row(get_random_button)
+    main_markup.row(get_random_button, get_all)
     main_markup.row(search_button, remove_keyboard_button)
 
     telegrame.send_message(telegram_api, chat_id=message.chat.id,
                            text="Hello, darling", reply_markup=main_markup)
+
+
+def get_series():
+    return Dir.list_of_files(State.series_path)
+
 
 
 encrypted_telegram_token = [-14, -23, -48, -15, -60, -50, -48, 5, -15, -14, -47, -6, -46, -37, 24, 30, -3, -14, -35, 11,
@@ -82,9 +88,12 @@ def start_todoist_bot():
         elif message.text.lower() == "search":
             State.search_mode = True
             telegrame.send_message(telegram_api, message.chat.id, "Enter search query")
+        elif message.text.lower() == "all":
+            series = get_series()
+            telegrame.send_message(telegram_api, message.chat.id, newline.join(series))
         elif State.search_mode:
             State.search_mode = False
-            series = Dir.list_of_files(State.series_path)
+            series = get_series()
             search_result = []
             for s in series:
                 if message.text.lower() in s.lower():
