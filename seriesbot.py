@@ -15,10 +15,11 @@ except ImportError:
     Pip.install("pytelegrambotapi")
     import telebot
 import telegrame
+from secrets import SERIES_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 
-my_chat_id = 5328715
+my_chat_id = MY_CHAT_ID
 
 
 class Arguments:
@@ -29,14 +30,6 @@ class State:
     series_path = "/mnt/btr/Phones Sync/later"
     search_mode = False
     removing_mode = False
-
-
-def reset_password():
-    global password
-    password = Str.input_pass()
-    GIV["api_password"] = password
-    return password
-
 
 def send_main_message(message):
     main_markup = telebot.types.ReplyKeyboardMarkup()
@@ -54,20 +47,7 @@ def send_main_message(message):
 def get_series():
     return Dir.list_of_files(State.series_path)
 
-
-
-encrypted_telegram_token = [-14, -23, -48, -15, -60, -50, -48, 5, -15, -14, -47, -6, -46, -37, 24, 30, -3, -14, -35, 11,
-                            -56, -24, 5, -1, 13, 13, 0, -3, -25, -30, -15, 41, 41, 32, -60, 0, -7, 11, -26, 57, 35, 30,
-                            13, 43, -16, -42]
-
-try:
-    password = GIV["api_password"]
-    if "reset" in sys.argv:
-        password = reset_password()
-except (NameError, KeyError) as e:
-    password = reset_password()
-
-telegram_token = Str.decrypt(encrypted_telegram_token, password)
+telegram_token = SERIES_TELEGRAM_TOKEN
 
 telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 

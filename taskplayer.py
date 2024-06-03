@@ -20,32 +20,17 @@ except ImportError:
     import telebot
 import time
 import telegrame
+from secrets import TASKPLAYER_TELEGRAM_TOKEN
 
-__version__ = "0.12.2"
+__version__ = "0.13.0"
 
 my_chat_id = 5328715
-ola_chat_id = 550959211
-tgx_chat_id = 619037205
 
 encrypted_telegram_token_taskplayer = [-14, -18, -50, -16, -61, -56, -42, 1, -21, -13, -40, -6, -40, -27, -26, 39, -16,
                                        50, 12, 50, -21, -58, -17, 36, 29, -14, -60, 41, -27, -56, -7, 58, 41, 31, -56,
                                        33, -12, 12, -19, 48, 42, 4, 8, 47, -34]
 
-
-def reset_password():
-    password = Str.input_pass()
-    GIV["api_password"] = password
-    return password
-
-
-try:
-    password = GIV["api_password"]
-    if "reset" in sys.argv:
-        password = reset_password()
-except (NameError, KeyError):
-    password = reset_password()
-
-telegram_token = Str.decrypt(encrypted_telegram_token_taskplayer, password)
+telegram_token = TASKPLAYER_TELEGRAM_TOKEN
 
 telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 
