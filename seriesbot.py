@@ -17,7 +17,7 @@ except ImportError:
 import telegrame
 from secrets import SERIES_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 my_chat_id = MY_CHAT_ID
 
@@ -99,13 +99,16 @@ def start_todoist_bot():
         elif message.text == "/start":
             send_main_message(message)
         else:
-            filename = message.text.lower() + ".mp4"
-            try:
-                File.create(Path.combine(State.series_path, filename))
-                message_send = f"Series '{filename}' added"
-            except FileExistsError:
-                message_send = f"Series '{filename}' already exists"
-            telegrame.send_message(telegram_api, message.chat.id, message_send)
+            for line in Str.nl(message_text):
+                if line.strip() == "":
+                    continue
+                filename = line.lower() + ".mp4"
+                try:
+                    File.create(Path.combine(State.series_path, filename))
+                    message_send = f"Series '{filename}' added"
+                except FileExistsError:
+                    message_send = f"Series '{filename}' already exists"
+                telegrame.send_message(telegram_api, message.chat.id, message_send)
 
     telegram_api.polling(none_stop=True)
     # https://github.com/eternnoir/pyTelegramBotAPI/issues/273
