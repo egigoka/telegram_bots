@@ -17,7 +17,7 @@ except ImportError:
 import telegrame
 from secrets import SERIES_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 my_chat_id = MY_CHAT_ID
 
