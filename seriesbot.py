@@ -99,7 +99,7 @@ def start_todoist_bot():
         elif message.text == "/start":
             send_main_message(message)
         else:
-            for line in Str.nl(message_text):
+            for line in Str.nl(message.text):
                 if line.strip() == "":
                     continue
                 filename = line.lower() + ".mp4"
