@@ -228,7 +228,7 @@ def get_all_items(state: State, todoist_api: Todoist):
 
 def get_random_todo(state: State, todoist_api: Todoist, telegram_api: (telebot.TeleBot, None), chat_id: int, cnt: bool):
     Print.rewrite("Getting random todo")
-    bench = Bench(prefix="Get random item in", quiet=True)
+    bench = Bench(prefix="Get random item in", verbose=False)
     bench.start()
     incomplete_items = get_all_items(state=state, todoist_api=todoist_api)
     # Print.debug(Print.prettify(incomplete_items, quiet=True))

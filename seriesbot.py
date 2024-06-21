@@ -3,7 +3,7 @@
 import os
 import sys
 try:
-    from commands import Path, Str, Dir, File, Random, Dict, GIV
+    from commands import Path, Str, Dir, File, Random, Dict, GIV, newline
 except ImportError:
     import os
     os.system("pip install git+https://github.com/egigoka/commands")
@@ -15,10 +15,11 @@ except ImportError:
     Pip.install("pytelegrambotapi")
     import telebot
 import telegrame
+from secrets import SERIES_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.1.2"
+__version__ = "0.4.1"
 
-my_chat_id = 5328715
+my_chat_id = MY_CHAT_ID
 
 
 class Arguments:
@@ -30,38 +31,23 @@ class State:
     search_mode = False
     removing_mode = False
 
-
-def reset_password():
-    global password
-    password = Str.input_pass()
-    GIV["api_password"] = password
-    return password
-
-
 def send_main_message(message):
     main_markup = telebot.types.ReplyKeyboardMarkup()
     get_random_button = telebot.types.KeyboardButton('Random')
+    get_all = telebot.types.KeyboardButton('All')
     search_button = telebot.types.KeyboardButton('Search')
     remove_keyboard_button = telebot.types.KeyboardButton('Remove')
-    main_markup.row(get_random_button)
+    main_markup.row(get_random_button, get_all)
     main_markup.row(search_button, remove_keyboard_button)
 
     telegrame.send_message(telegram_api, chat_id=message.chat.id,
                            text="Hello, darling", reply_markup=main_markup)
 
 
-encrypted_telegram_token = [-14, -23, -48, -15, -60, -50, -48, 5, -15, -14, -47, -6, -46, -37, 24, 30, -3, -14, -35, 11,
-                            -56, -24, 5, -1, 13, 13, 0, -3, -25, -30, -15, 41, 41, 32, -60, 0, -7, 11, -26, 57, 35, 30,
-                            13, 43, -16, -42]
+def get_series():
+    return Dir.list_of_files(State.series_path)
 
-try:
-    password = GIV["api_password"]
-    if "reset" in sys.argv:
-        password = reset_password()
-except (NameError, KeyError) as e:
-    password = reset_password()
-
-telegram_token = Str.decrypt(encrypted_telegram_token, password)
+telegram_token = SERIES_TELEGRAM_TOKEN
 
 telegram_api = telebot.TeleBot(telegram_token, threaded=False)
 
@@ -79,12 +65,16 @@ def start_todoist_bot():
             series = Dir.list_of_files(State.series_path)
             random_series = Random.item(series)
             telegrame.send_message(telegram_api, message.chat.id, random_series.replace(".mp4", ""))
-        elif message.text.lower() == "search":
+        elif message.text.lower() in ["search", "find"]:
             State.search_mode = True
             telegrame.send_message(telegram_api, message.chat.id, "Enter search query")
+        elif message.text.lower() == "all":
+            series = get_series()
+            series.sort()
+            telegrame.send_message(telegram_api, message.chat.id, newline.join(series))
         elif State.search_mode:
             State.search_mode = False
-            series = Dir.list_of_files(State.series_path)
+            series = get_series()
             search_result = []
             for s in series:
                 if message.text.lower() in s.lower():
@@ -96,7 +86,9 @@ def start_todoist_bot():
             telegrame.send_message(telegram_api, message.chat.id, "Enter name to remove")
         elif State.removing_mode:
             State.removing_mode = False
-            filename = message.text.lower() + ".mp4"
+            filename = message.text.lower()
+            filename = filename.replace("<space>", " ")
+            filename += ".mp4"
             path = Path.combine(State.series_path, filename)
             if File.exist(path):
                 File.delete(path)
@@ -107,13 +99,16 @@ def start_todoist_bot():
         elif message.text == "/start":
             send_main_message(message)
         else:
-            filename = message.text.lower() + ".mp4"
-            try:
-                File.create(Path.combine(State.series_path, filename))
-                message_send = f"Series '{filename}' added"
-            except FileExistsError:
-                message_send = f"Series '{filename}' already exists"
-            telegrame.send_message(telegram_api, message.chat.id, message_send)
+            for line in Str.nl(message.text):
+                if line.strip() == "":
+                    continue
+                filename = line.lower() + ".mp4"
+                try:
+                    File.create(Path.combine(State.series_path, filename))
+                    message_send = f"Series '{filename}' added"
+                except FileExistsError:
+                    message_send = f"Series '{filename}' already exists"
+                telegrame.send_message(telegram_api, message.chat.id, message_send)
 
     telegram_api.polling(none_stop=True)
     # https://github.com/eternnoir/pyTelegramBotAPI/issues/273
