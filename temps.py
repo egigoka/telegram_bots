@@ -226,7 +226,7 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
     A list of strings, where each string is the analysis of the output of the `hddtemp /dev/disk_name` command.
     """
     results = []
-    for hard_drive in hard_drives:
+    for hard_drive in Str.nl(hard_drives.strip()):
         disk_info = parse_hard_drive_line(hard_drive)
 
         disk_name = disk_info["disk_name"]
@@ -289,8 +289,10 @@ def _start_bot_sender():
 
         if sensors or hard_drives_info or failed_systemd:
             message_text = f"{now_dt}\n{sensors}{hard_drives_info}{failed_systemd}"
+            print(message_text)
             send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
-
+        else:
+            print(str(datetime.datetime.now()) + " nothing abnormal.")
         Time.sleep(300)
 
 
@@ -298,7 +300,7 @@ def safe_threads_run():
     # https://www.tutorialspoint.com/python/python_multithreading.htm  # you can expand current implementation
 
     print(f"Main thread v{__version__} started")
-
+    
     threads = Threading()
 
     threads.add(telegrame.very_safe_start_bot, args=(_start_bot_receiver,))
