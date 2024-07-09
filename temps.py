@@ -254,7 +254,10 @@ def failed_systemd_services(ignore_services=None):
     services = Console.get_output("systemctl", "list-units", "--state=failed", "--no-legend", "--plain").strip()
     output = ""
     for service in Str.nl(services):
-        service_name = service.split()[0]
+        try:
+            service_name = service.split()[0]
+        except IndexError:
+            continue
         if ignore_services is None or service_name not in ignore_services:
             output += f"{service}\n"
     return output
