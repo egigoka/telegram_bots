@@ -1,6 +1,7 @@
 *__pycache__*
 *configs/telegram_bot_todoist*
 *configs/taskplayer*
+*configs/TaskPlayer*
 configs/TaskPlayer_state.json
 secrets.py
 .idea/
