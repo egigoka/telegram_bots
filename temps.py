@@ -102,6 +102,9 @@ def parse_sensor_line(line):
     if len(parts) < 2:
         return None  # Skip lines that don't contain a colon
 
+    if line.startswith("ERROR: Can't get value of subfeature"):
+        return None
+
     sensor_name = parts[0].strip()
     value_section = parts[1].strip()
     details = value_section.split('(')
