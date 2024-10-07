@@ -90,6 +90,10 @@ def convert_units(value, unit):
         return value, unit
     if unit == 'V':
         return value, unit
+    if unit == "mW":
+        return value / 1000, "W"
+    if unit == "W":
+        return value, unit
     raise ValueError(f"Unknown unit: {unit}")
 
 
