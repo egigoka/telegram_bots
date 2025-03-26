@@ -19,10 +19,10 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
-IGNORED_SENSORS = ["CHASSIS1 FAN Speed"]
-IGNORED_HARD_DRIVES_TEMPERATURE = ["M4-CT128M4SSD2"]
+IGNORED_SENSORS = ["fan1"]
+IGNORED_HARD_DRIVES_TEMPERATURE = []
 IGNORED_SYSTEMD_SERVICES = ["gmail-cli-ai.service"]
 OUTPUT_ALL_SENSORS = False
 
@@ -205,13 +205,17 @@ def parse_hard_drive_line(line):
     disk_name = parts[1].strip()
     disk_info = parts[2].strip()
 
-    # Extract the temperature value
-    temp_value = Str.get_integers(disk_info)[0]
 
     # Initialize min and max
     min_val = 5
     max_val = 55
     status = 'OK'
+
+    # Extract the temperature value
+    if disk_info == "S.M.A.R.T. not available":
+        temp_value = min_val
+    else:
+        temp_value = Str.get_integers(disk_info)[0]
 
     # Check if the current value is within the range
     if (temp_value < min_val) or (temp_value > max_val):
