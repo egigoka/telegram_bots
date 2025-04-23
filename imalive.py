@@ -41,13 +41,17 @@ def _start_bot_receiver():
 
 
 def _start_bot_sender():
+    last_sent = None
     while True:
         now_dt = datetime.datetime.now()
-        
-        message_text = f"{now_dt} - {HOSTNAME}"
-        print(message_text)
-        telegrame.send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
-        Time.sleep(60)
+        string = now_dt.strftime("%Y-%m-%d %H:%M")
+
+        if string != last_sent:
+            last_sent = string
+            message_text = f"{string} - {HOSTNAME}"
+            print(message_text)
+            telegrame.send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
+        Time.sleep(0.9)
 
 
 def safe_threads_run():
