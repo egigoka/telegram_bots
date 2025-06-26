@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 IGNORED_SENSORS = ["fan1"]
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -27,6 +27,12 @@ IGNORED_SYSTEMD_SERVICES = ["gmail-cli-ai.service"]
 OUTPUT_ALL_SENSORS = False
 
 TELEGRAM_API = telebot.TeleBot(TEMPS_TELEGRAM_TOKEN, threaded=False)
+
+print_original = print
+
+def print(*args, **kwargs):
+    kwargs["flush"] = True
+    print_original(*args, **kwargs)
 
 
 def get_list_of_disks():
@@ -262,15 +268,45 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
 
 
 def failed_systemd_services(ignore_services=None):
+
+    # plain failed
     services = Console.get_output("systemctl", "list-units", "--state=failed", "--no-legend", "--plain").strip()
+    services += newline
+    # auto restarting or stuck
+    services += Console.get_output("systemctl", "list-units", "--state=activating", "--no-legend", "--plain").strip()
+    # in /etc/systemd/system
+    to_check = Dir.list_of_files("/etc/systemd/system")
+    
     output = ""
+    
     for service in Str.nl(services):
         try:
             service_name = service.split()[0]
         except IndexError:
             continue
         if ignore_services is None or service_name not in ignore_services:
-            output += f"{service}\n"
+            to_check.append(service_name)
+    
+    for file in to_check:
+        status = Console.get_output("systemctl", "status", "-l", file)
+        active = ""
+        triggered_by = None
+        for line in Str.nl(status):
+            if "Active: " in line:
+                active = Str.substring(line, "Active: ", " ", safe = True)
+            elif "TriggeredBy: " in line:
+                triggered_by = Str.substring(line, "TriggeredBy: ", safe = True)
+        if active == "active":
+            continue
+        if triggered_by is not None and active == "inactive":
+            continue
+        # if (not active.startswith("active")) and (triggered_by is None and not (active.startswith("inactive") or active.startswith("active"))):
+        output += newline
+        output += status
+        # print(status)
+        Print.colored(file, "green")
+        Print.colored("None" if active is None else active, "red")
+#    print(output)
     return output
 
 
@@ -279,7 +315,7 @@ def _start_bot_receiver():
     def reply_all_messages(message):
         TELEGRAM_API.forward_message(MY_CHAT_ID, message.chat.id, message.message_id,
                                      disable_notification=True)
-        Print.rewrite()
+        # Print.rewrite()
         print(f"from {message.chat.id}: {message.text}")
 
     TELEGRAM_API.polling(none_stop=True)
@@ -322,7 +358,7 @@ def safe_threads_run():
 
     threads.start(wait_for_keyboard_interrupt=True)
 
-    Print.rewrite()
+    # Print.rewrite()
     print("Main thread quited")
 
 
