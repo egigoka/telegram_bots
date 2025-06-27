@@ -25,6 +25,7 @@ IGNORED_SENSORS = ["fan1"]
 IGNORED_HARD_DRIVES_TEMPERATURE = []
 IGNORED_SYSTEMD_SERVICES = ["gmail-cli-ai.service"]
 OUTPUT_ALL_SENSORS = False
+RUN_EVERY = 300
 
 TELEGRAM_API = telebot.TeleBot(TEMPS_TELEGRAM_TOKEN, threaded=False)
 
@@ -291,15 +292,25 @@ def failed_systemd_services(ignore_services=None):
         status = Console.get_output("systemctl", "status", "-l", file)
         active = ""
         triggered_by = None
+        since = ""
         for line in Str.nl(status):
             if "Active: " in line:
                 active = Str.substring(line, "Active: ", " ", safe = True)
+                since = Str.substring(line, "since", ";", safe = True) + "00"
             elif "TriggeredBy: " in line:
                 triggered_by = Str.substring(line, "TriggeredBy: ", safe = True)
+
         if active == "active":
-            continue
+            continue  # if active, skip
         if triggered_by is not None and active == "inactive":
-            continue
+            continue  # if it has trigger, and it's in active, inactive - skip
+        since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
+        since_delta = datetime.datetime.now(datetime.timezone.now) - since_time
+        if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
+            continue  # if it's activating for less than loop time, skip
+
+        
+
         # if (not active.startswith("active")) and (triggered_by is None and not (active.startswith("inactive") or active.startswith("active"))):
         output += newline
         output += status
@@ -343,7 +354,7 @@ def _start_bot_sender():
             send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
         else:
             print(str(datetime.datetime.now()) + " nothing abnormal.")
-        Time.sleep(300)
+        Time.sleep(RUN_EVERY)
 
 
 def safe_threads_run():
