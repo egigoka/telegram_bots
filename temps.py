@@ -304,17 +304,16 @@ def failed_systemd_services(ignore_services=None):
             continue  # if active, skip
         if triggered_by is not None and active == "inactive":
             continue  # if it has trigger, and it's in active, inactive - skip
-        since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
-        since_delta = datetime.datetime.now(datetime.timezone.now) - since_time
-        if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
-            continue  # if it's activating for less than loop time, skip
+        try:
+            since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
+            since_delta = datetime.datetime.now(datetime.timezone.now) - since_time
+            if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
+                continue  # if it's activating for less than loop time, skip
+        except ValueError:
+            pass
 
         output += newline
         output += status
-        # print(status)
-        Print.colored(file, "green")
-        Print.colored("None" if active is None else active, "red")
-#    print(output)
     return output
 
 
@@ -375,7 +374,7 @@ def safe_threads_run():
 
 
 if __name__ == '__main__':
-    if "--once" in OS.args():
+    if "--once" in OS.args:
         check_everything()
     else:
         safe_threads_run()
