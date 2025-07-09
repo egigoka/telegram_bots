@@ -23,7 +23,7 @@ __version__ = "0.1.2"
 
 IGNORED_SENSORS = ["fan1"]
 IGNORED_HARD_DRIVES_TEMPERATURE = []
-IGNORED_SYSTEMD_SERVICES = ["gmail-cli-ai.service"]
+IGNORED_SYSTEMD_SERVICES = []
 OUTPUT_ALL_SENSORS = False
 RUN_EVERY = 300
 
@@ -309,9 +309,6 @@ def failed_systemd_services(ignore_services=None):
         if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
             continue  # if it's activating for less than loop time, skip
 
-        
-
-        # if (not active.startswith("active")) and (triggered_by is None and not (active.startswith("inactive") or active.startswith("active"))):
         output += newline
         output += status
         # print(status)
@@ -319,6 +316,29 @@ def failed_systemd_services(ignore_services=None):
         Print.colored("None" if active is None else active, "red")
 #    print(output)
     return output
+
+
+def check_everything():
+    now_dt = datetime.datetime.now()
+
+    sensors = get_sensors_data(OUTPUT_ALL_SENSORS, IGNORED_SENSORS)
+
+    disks = get_list_of_disks()
+    hard_drives_temps = get_drive_temps(disks)
+    hard_drives_info = analyse_hard_drives(hard_drives_temps, OUTPUT_ALL_SENSORS, IGNORED_HARD_DRIVES_TEMPERATURE)
+
+    failed_systemd = failed_systemd_services(IGNORED_SYSTEMD_SERVICES)
+
+    failed_systemd = newline + failed_systemd if failed_systemd else ""
+    hard_drives_info = newline + hard_drives_info if hard_drives_info else ""
+    sensors = newline + sensors if sensors else ""
+
+    if sensors or hard_drives_info or failed_systemd:
+        message_text = f"{now_dt}\n{sensors}{hard_drives_info}{failed_systemd}"
+        print(message_text)
+        send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
+    else:
+        print(str(datetime.datetime.now()) + " nothing abnormal.")
 
 
 def _start_bot_receiver():
@@ -334,26 +354,7 @@ def _start_bot_receiver():
 
 def _start_bot_sender():
     while True:
-        now_dt = datetime.datetime.now()
-
-        sensors = get_sensors_data(OUTPUT_ALL_SENSORS, IGNORED_SENSORS)
-
-        disks = get_list_of_disks()
-        hard_drives_temps = get_drive_temps(disks)
-        hard_drives_info = analyse_hard_drives(hard_drives_temps, OUTPUT_ALL_SENSORS, IGNORED_HARD_DRIVES_TEMPERATURE)
-
-        failed_systemd = failed_systemd_services(IGNORED_SYSTEMD_SERVICES)
-
-        failed_systemd = newline + failed_systemd if failed_systemd else ""
-        hard_drives_info = newline + hard_drives_info if hard_drives_info else ""
-        sensors = newline + sensors if sensors else ""
-
-        if sensors or hard_drives_info or failed_systemd:
-            message_text = f"{now_dt}\n{sensors}{hard_drives_info}{failed_systemd}"
-            print(message_text)
-            send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
-        else:
-            print(str(datetime.datetime.now()) + " nothing abnormal.")
+        check_everything()
         Time.sleep(RUN_EVERY)
 
 
@@ -374,4 +375,8 @@ def safe_threads_run():
 
 
 if __name__ == '__main__':
-    safe_threads_run()
+    if "--once" in OS.args():
+        check_everything()
+    else:
+        safe_threads_run()
+    
