@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -268,6 +268,9 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
     return newline.join(results)
 
 
+
+
+
 def failed_systemd_services(ignore_services=None):
 
     # plain failed
@@ -301,6 +304,8 @@ def failed_systemd_services(ignore_services=None):
                 since = Str.substring(line, "since", ";", safe = True) + "00"
             elif "TriggeredBy: " in line:
                 triggered_by = Str.substring(line, "TriggeredBy: ", safe = True)
+            elif line.strip() == "":
+                break
 
         if active == "active":
             continue  # if active, skip
