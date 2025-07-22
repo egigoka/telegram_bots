@@ -315,8 +315,8 @@ def failed_systemd_services(ignore_services=None):
             pass
 
         # debug
-        output += f"{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
-
+        output = f"{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
+        
         output += newline
         output += status
         outputs.append(output)
