@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -377,7 +377,8 @@ def safe_threads_run():
     
     threads = Threading()
 
-    threads.add(telegrame.very_safe_start_bot, args=(_start_bot_receiver,))
+    if "--no-receive" not in OS.args:
+        threads.add(telegrame.very_safe_start_bot, args=(_start_bot_receiver,))
     threads.add(telegrame.very_safe_start_bot, args=(_start_bot_sender,))
 
     threads.start(wait_for_keyboard_interrupt=True)
