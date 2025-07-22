@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -340,7 +340,7 @@ def check_everything():
     #sensors = newline + sensors if sensors else ""
 
     if sensors or hard_drives_info or failed_systemd:
-        ouputs = [sensors, hard_drives_info] + failed_systemd
+        outputs = [sensors, hard_drives_info] + failed_systemd
 
         for output in outputs:
             message_text = f"{now_dt}\t{hostname}\n\n{output}"
