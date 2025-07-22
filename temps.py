@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 
 IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -278,7 +278,7 @@ def failed_systemd_services(ignore_services=None):
     # in /etc/systemd/system
     to_check = Dir.list_of_files("/etc/systemd/system")
     
-    output = ""
+    outputs = []
     
     for service in Str.nl(services):
         try:
@@ -315,14 +315,16 @@ def failed_systemd_services(ignore_services=None):
             pass
 
         # debug
-        output += f"{newline}{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
+        output += f"{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
 
         output += newline
         output += status
-    return output
+        outputs.append(output)
+    return outputs
 
 
 def check_everything():
+    hostname = OS.hostname
     now_dt = datetime.datetime.now()
 
     sensors = get_sensors_data(OUTPUT_ALL_SENSORS, IGNORED_SENSORS)
@@ -333,14 +335,20 @@ def check_everything():
 
     failed_systemd = failed_systemd_services(IGNORED_SYSTEMD_SERVICES)
 
-    failed_systemd = newline + failed_systemd if failed_systemd else ""
-    hard_drives_info = newline + hard_drives_info if hard_drives_info else ""
-    sensors = newline + sensors if sensors else ""
+    #failed_systemd = newline + failed_systemd if failed_systemd else ""
+    #hard_drives_info = newline + hard_drives_info if hard_drives_info else ""
+    #sensors = newline + sensors if sensors else ""
 
     if sensors or hard_drives_info or failed_systemd:
-        message_text = f"{now_dt}\n{sensors}{hard_drives_info}{failed_systemd}"
-        print(message_text)
-        send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
+        ouputs = [sensors, hard_drives_info] + failed_systemd
+
+        for output in outputs:
+            message_text = f"{now_dt}\t{hostname}\n\n{output}"
+            print(message_text)
+            send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
+        #message_text = f"{now_dt}\n{sensors}{hard_drives_info}{failed_systemd}"
+        #print(message_text)
+        #send_message(TELEGRAM_API, MY_CHAT_ID, message_text)
     else:
         print(str(datetime.datetime.now()) + " nothing abnormal.")
 
