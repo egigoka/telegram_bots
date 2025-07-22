@@ -19,9 +19,9 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
-IGNORED_SENSORS = ["fan1"]
+IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
 IGNORED_SYSTEMD_SERVICES = []
 OUTPUT_ALL_SENSORS = False
@@ -293,6 +293,8 @@ def failed_systemd_services(ignore_services=None):
         active = ""
         triggered_by = None
         since = ""
+        since_time = None
+        since_delta = None
         for line in Str.nl(status):
             if "Active: " in line:
                 active = Str.substring(line, "Active: ", " ", safe = True)
@@ -311,6 +313,9 @@ def failed_systemd_services(ignore_services=None):
                 continue  # if it's activating for less than loop time, skip
         except ValueError:
             pass
+
+        # debug
+        output += f"{newline}{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
 
         output += newline
         output += status
