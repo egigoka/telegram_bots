@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 IGNORED_SENSORS = []
 IGNORED_HARD_DRIVES_TEMPERATURE = []
@@ -268,7 +268,29 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
     return newline.join(results)
 
 
+def get_systemctl_properties(status):
+    active = ""
+    triggered_by = None
+    since = ""
+    since_time = ""
+    since_delta = None
+    
+    for line in Str.nl(status):
+        if "Active: " in line:
+            active = Str.substring(line, "Active: ", " ", safe = True)
+            since = Str.substring(line, "since ", ";", safe = True) + "00"
+        elif "TriggeredBy: " in line:
+            triggered_by = Str.substring(line, "TriggeredBy: ", safe = True)
+        elif line.strip() == "":
+            break
 
+    try:
+        since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
+        since_delta = datetime.datetime.now(since_time.tzinfo) - since_time                                   
+    except ValueError:
+        pass
+
+    return active, triggered_by, since, since_time, since_delta
 
 
 def failed_systemd_services(ignore_services=None):
@@ -293,29 +315,19 @@ def failed_systemd_services(ignore_services=None):
     
     for file in to_check:
         status = Console.get_output("systemctl", "status", "-l", file)
-        active = ""
-        triggered_by = None
-        since = ""
-        since_time = None
-        since_delta = None
-        for line in Str.nl(status):
-            if "Active: " in line:
-                active = Str.substring(line, "Active: ", " ", safe = True)
-                since = Str.substring(line, "since", ";", safe = True) + "00"
-            elif "TriggeredBy: " in line:
-                triggered_by = Str.substring(line, "TriggeredBy: ", safe = True)
-            elif line.strip() == "":
-                break
+        
+        active, triggered_by, since, since_time, since_delta = get_systemctl_properties(status)
 
         if active == "active":
-            continue  # if active, skip
+            continue  # if active - skip
         if triggered_by is not None and active == "inactive":
             continue  # if it has trigger, and it's in active, inactive - skip
+        if since_delta is not None:
+            if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
+                continue  # if it's activating for less than loop time - skip
         try:
             since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
             since_delta = datetime.datetime.now(datetime.timezone.now) - since_time
-            if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
-                continue  # if it's activating for less than loop time, skip
         except ValueError:
             pass
 
