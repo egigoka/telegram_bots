@@ -19,7 +19,7 @@ except ImportError:
 import telegrame
 from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 BATTERY = OS.args[1]
 ONCE = "--once" in OS.args
@@ -57,14 +57,12 @@ def save_previous(state):
 
 
 def get_time_to(state):
-    try:
-        return state["time to empty"]
-    except KeyError:
-        return state["time to full"]
-#    time_to_completion = "time to empty"
-#    if time_to_completion not in state.keys():
-#        time_to_completion = "time to full"
-#    return state[time_to_completion]
+    time_to_completion = "time to empty"
+    if time_to_completion not in state.keys():
+        time_to_completion = "time to full"
+    if time_to_completion not in state.keys():
+        return None  # none found
+    return state[time_to_completion]
 
 
 def check_battery():
@@ -85,7 +83,12 @@ def check_battery():
         or PREVIOUS['state'] != output['state']
 
     if changed:
-        message = f"{HOSTNAME}: {output['percentage']}, {get_time_to(output)} left, {output['state']}"
+        time_to = get_time_to(output)
+        if time_to is None:
+            time_to = ""
+        else:
+            time_to = f", {time_to} left"
+        message = f"{HOSTNAME}: {output['percentage']}{time_to}, {output['state']}"
         if DEBUG:
             print(message)
         telegrame.send_message(TELEGRAM_API, MY_CHAT_ID, message)
