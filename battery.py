@@ -1,0 +1,121 @@
+#! python3
+# -*- coding: utf-8 -*-
+import datetime
+
+try:
+    from commands import *
+except ImportError:
+    import os
+
+    os.system("pip install git+https://github.com/egigoka/commands")
+    from commands import *
+try:
+    import telebot
+except ImportError:
+    from commands.pip9 import Pip
+
+    Pip.install("pytelegrambotapi")
+    import telebot
+import telegrame
+from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID
+
+__version__ = "0.0.1"
+
+BATTERY = OS.args[1]
+ONCE = "--once" in OS.args
+DEBUG = "--debug" in OS.args
+PREVIOUS = JsonDict("./configs/battery.json")
+RUN_EVERY = 300
+HOSTNAME = OS.hostname
+
+TELEGRAM_API = telebot.TeleBot(BATTERY_TELEGRAM_TOKEN, threaded=False)
+
+print_original = print
+
+def print(*args, **kwargs):
+    kwargs["flush"] = True
+    print_original(*args, **kwargs)
+
+def get_battery_struct():
+    out = Console.get_output(["upower", "-i", BATTERY])
+    struct = {}
+    for line in Str.nl(out):
+        if not line:
+            continue
+        words = line.split(":")
+        key = words[0].strip()
+        value = " ".join(words[1:]).strip()
+        if not value:
+            continue
+        struct[key] = value
+    return struct
+
+
+def save_previous(state):
+    PREVIOUS.string = state
+    PREVIOUS.save()
+
+
+def get_time_to(state):
+    try:
+        return state["time to empty"]
+    except KeyError:
+        return state["time to full"]
+#    time_to_completion = "time to empty"
+#    if time_to_completion not in state.keys():
+#        time_to_completion = "time to full"
+#    return state[time_to_completion]
+
+
+def check_battery():
+    output = get_battery_struct()
+
+    if DEBUG:
+        print(output)
+    
+    if DEBUG:
+        print(f"now = {output['percentage']} {get_time_to(output)} {output['state']}")
+    if PREVIOUS:
+        if DEBUG:
+            print(f"previous = {PREVIOUS['percentage']} {get_time_to(PREVIOUS)} {output['state']}")
+    else:
+        save_previous(output)
+    
+    changed = PREVIOUS['percentage'] != output["percentage"] \
+        or PREVIOUS['state'] != output['state']
+
+    if changed:
+        message = f"{HOSTNAME}: {output['percentage']}, {get_time_to(output)} left, {output['state']}"
+        if DEBUG:
+            print(message)
+        telegrame.send_message(TELEGRAM_API, MY_CHAT_ID, message)
+        save_previous(output)
+
+
+def _start_bot_sender():
+    while True:
+        check_battery()
+        Time.sleep(RUN_EVERY)
+
+
+def safe_threads_run():
+    # https://www.tutorialspoint.com/python/python_multithreading.htm  # you can expand current implementation
+
+    print(f"Main thread v{__version__} started")
+    
+    threads = Threading()
+
+    threads.add(telegrame.very_safe_start_bot, args=(_start_bot_sender,))
+
+    threads.start(wait_for_keyboard_interrupt=True)
+
+    # Print.rewrite()
+    print("Main thread quited")
+
+
+if __name__ == '__main__':
+    if ONCE:
+        check_battery()
+    else:
+        safe_threads_run()
+    
