@@ -78,8 +78,16 @@ def check_battery():
             print(f"previous = {PREVIOUS['percentage']} {get_time_to(PREVIOUS)} {output['state']}")
     else:
         save_previous(output)
+
+    now_percentage = int(output["percentage"][:-1])
+    try:
+        previous_percentage = int(PREVIOUS["percentage"][:-1])
+    except ValueError:
+        previous_percentage = 0
+
+    diff = abs(now_percentage - previous_percentage)
     
-    changed = PREVIOUS['percentage'] != output["percentage"] \
+    changed = diff > 10 \
         or PREVIOUS['state'] != output['state']
 
     if changed:
