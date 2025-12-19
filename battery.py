@@ -5,21 +5,29 @@ import datetime
 try:
     from commands import *
 except ImportError:
-    import os
-
-    os.system("pip install git+https://github.com/egigoka/commands")
-    from commands import *
+    import sys
+    print("install https://github.com/egigoka/commands")
+    sys.exit(1)
 try:
     import telebot
 except ImportError:
-    from commands.pip9 import Pip
+    import sys
+    print("install pytelegrambotapi")
+    sys.exit(1)
+try:
+    import telegrame
+except ImportError:
+    import sys
+    print("install https://github.com/egigoka/telegrame")
+    sys.exit(1)
+try:
+    from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID
+except ImportError:
+    import sys
+    print("create secrets.py with BATTERY_TELEGRAM_TOKEN and MY_CHAT_ID")
+    sys.exit(1)
 
-    Pip.install("pytelegrambotapi")
-    import telebot
-import telegrame
-from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID
-
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 BATTERY = OS.args[1]
 ONCE = "--once" in OS.args
