@@ -5,3 +5,5 @@
 configs/TaskPlayer_state.json
 secrets.py
 .idea/
+default.profraw
+configs/battery.json
