@@ -271,6 +271,35 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
 
 
 
+def should_skip_service(active, triggered_by, since_delta, run_every):
+    """
+    Determine if a service should be skipped (not reported as problematic).
+
+    Args:
+        active: The active state of the service (e.g., "active", "inactive", "activating", "failed")
+        triggered_by: The trigger unit if any (or None)
+        since_delta: timedelta since the service entered current state (or None)
+        run_every: The check interval in seconds
+
+    Returns:
+        True if the service should be skipped, False if it should be reported
+    """
+    # If active, skip - service is running fine
+    if active == "active":
+        return True
+
+    # If it has a trigger and is inactive, skip - it's waiting for its trigger
+    if triggered_by is not None and active == "inactive":
+        return True
+
+    # If it's activating for less than the loop time, skip - give it time to start
+    if active == "activating" and since_delta is not None:
+        if since_delta.total_seconds() <= run_every:
+            return True
+
+    return False
+
+
 def failed_systemd_services(ignore_services=None):
 
     # plain failed
@@ -280,9 +309,9 @@ def failed_systemd_services(ignore_services=None):
     services += Console.get_output("systemctl", "list-units", "--state=activating", "--no-legend", "--plain").strip()
     # in /etc/systemd/system
     to_check = Dir.list_of_files("/etc/systemd/system")
-    
+
     outputs = []
-    
+
     for service in Str.nl(services):
         try:
             service_name = service.split()[0]
@@ -290,7 +319,7 @@ def failed_systemd_services(ignore_services=None):
             continue
         if ignore_services is None or service_name not in ignore_services:
             to_check.append(service_name)
-    
+
     for file in to_check:
         status = Console.get_output("systemctl", "status", "-l", file)
         active = ""
@@ -307,21 +336,18 @@ def failed_systemd_services(ignore_services=None):
             elif line.strip() == "":
                 break
 
-        if active == "active":
-            continue  # if active, skip
-        if triggered_by is not None and active == "inactive":
-            continue  # if it has trigger, and it's in active, inactive - skip
         try:
             since_time = datetime.datetime.strptime(since, "%a %Y-%m-%d %H:%M:%S %z")
-            since_delta = datetime.datetime.now(datetime.timezone.now) - since_time
-            if since_delta.total_seconds() <= RUN_EVERY and active == "activating":
-                continue  # if it's activating for less than loop time, skip
+            since_delta = datetime.datetime.now(since_time.tzinfo) - since_time
         except ValueError:
-            pass
+            since_delta = None
+
+        if should_skip_service(active, triggered_by, since_delta, RUN_EVERY):
+            continue
 
         # debug
         output = f"{file=} {active=} {triggered_by=} {since_time=} {since_delta=}"
-        
+
         output += newline
         output += status
         outputs.append(output)
