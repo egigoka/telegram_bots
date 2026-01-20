@@ -31,7 +31,7 @@ class State:
     def __init__(self):
         f = Path.safe__file__(os.path.split(__file__)[0])
         json_path = Path.combine(f, "configs", "telegram_bot_todoist.json")
-        self.config_json = Json(json_path)
+        self.config_json = JsonDict(json_path)
 
         self.getting_project_name = False
         self.getting_item_name = False
@@ -111,7 +111,6 @@ except (NameError, KeyError):
 
 telegram_token = Str.decrypt(encrypted_telegram_token, password)
 todoist_api_key = Str.decrypt(encrypted_todoist_token, password)
-
 
 def get_random_todo(todo_api, telegram_api, chat_id):
     Print.rewrite("Getting random todo")
