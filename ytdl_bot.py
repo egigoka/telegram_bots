@@ -167,6 +167,17 @@ def clear_status_messages(chat_id):
     STATUS_MESSAGES[chat_id] = []
 
 
+def clean_youtube_url(url):
+    """Remove tracking parameters like 'si' from YouTube URLs."""
+    import urllib.parse
+    parsed = urllib.parse.urlparse(url)
+    params = urllib.parse.parse_qs(parsed.query)
+    # Remove 'si' tracking parameter
+    params.pop('si', None)
+    clean_query = urllib.parse.urlencode(params, doseq=True)
+    return urllib.parse.urlunparse(parsed._replace(query=clean_query))
+
+
 def is_youtube_url(text):
     """Check if the text is a valid YouTube URL."""
     if not text:
@@ -196,6 +207,23 @@ def get_video_title(url):
     except Exception as e:
         print(f"Error getting video title: {e}")
         return "Unknown Title"
+
+
+def get_audio_duration(file_path):
+    """Get audio duration using ffprobe."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", file_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            return int(float(result.stdout.strip()))
+    except Exception as e:
+        print(f"Error getting audio duration: {e}")
+    return None
 
 
 def get_thumbnail(url, folder):
@@ -477,9 +505,6 @@ def show_format_choice(chat_id, user_id, url):
     # Store URL for later
     PENDING_CHOICES[user_id] = url
 
-    # Get video title
-    title = get_video_title(url)
-
     # Create inline keyboard
     markup = telebot.types.InlineKeyboardMarkup()
     video_btn = telebot.types.InlineKeyboardButton(
@@ -489,7 +514,7 @@ def show_format_choice(chat_id, user_id, url):
     markup.row(video_btn, audio_btn)
 
     msg = telegrame.send_message(TELEGRAM_API, chat_id,
-                                 f"{title}\n\nChoose format:",
+                                 "Choose format:",
                                  reply_markup=markup)
     add_status_message(chat_id, msg)
 
@@ -641,6 +666,9 @@ def process_audio_download(chat_id, user_id, url):
         # Get thumbnail
         thumbnail_path = get_thumbnail(url, temp_dir)
 
+        # Get audio duration
+        duration = get_audio_duration(audio_path)
+
         # Upload to Telegram
         msg = telegrame.send_message(TELEGRAM_API, chat_id, "Uploading audio...")
         add_status_message(chat_id, msg)
@@ -654,8 +682,9 @@ def process_audio_download(chat_id, user_id, url):
                 TELEGRAM_API.send_audio(
                     chat_id,
                     audio_file,
-                    caption=f"{title}\n\nSource: {url}",
+                    caption=f"Source: {clean_youtube_url(url)}",
                     title=title,
+                    duration=duration,
                     thumb=thumb_file,
                     timeout=300
                 )
@@ -754,7 +783,7 @@ def process_download(chat_id, user_id, url):
                 TELEGRAM_API.send_video(
                     chat_id,
                     video_file,
-                    caption=f"{title}\n\nSource: {url}",
+                    caption=f"{title}\n\nSource: {clean_youtube_url(url)}",
                     supports_streaming=True,
                     width=width,
                     height=height,
