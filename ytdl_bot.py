@@ -32,14 +32,111 @@ except ImportError:
     import telegrame
 
 try:
-    from secrets import YTDL_TELEGRAM_TOKEN, MY_CHAT_ID
+    from secrets import YTDL_TELEGRAM_TOKEN, MY_CHAT_ID, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 except ImportError:
-    print("Error: YTDL_TELEGRAM_TOKEN and MY_CHAT_ID must be defined in secrets.py")
+    print("Error: YTDL_TELEGRAM_TOKEN, MY_CHAT_ID, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET must be defined in secrets.py")
     sys.exit(1)
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
+
+# Spotify token cache
+SPOTIFY_TOKEN = {"token": None, "expires": 0}
+
+
+def get_spotify_token():
+    """Get Spotify access token using client credentials flow."""
+    import base64
+    import time
+
+    # Return cached token if still valid
+    if SPOTIFY_TOKEN["token"] and time.time() < SPOTIFY_TOKEN["expires"]:
+        return SPOTIFY_TOKEN["token"]
+
+    try:
+        import requests
+        auth_str = f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}"
+        auth_b64 = base64.b64encode(auth_str.encode()).decode()
+
+        response = requests.post(
+            "https://accounts.spotify.com/api/token",
+            headers={"Authorization": f"Basic {auth_b64}"},
+            data={"grant_type": "client_credentials"},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            SPOTIFY_TOKEN["token"] = data["access_token"]
+            SPOTIFY_TOKEN["expires"] = time.time() + data["expires_in"] - 60
+            return SPOTIFY_TOKEN["token"]
+    except Exception as e:
+        print(f"Error getting Spotify token: {e}")
+    return None
+
+
+def clean_title_for_search(title):
+    """Clean YouTube title for better Spotify search results."""
+    import re
+    # Remove common YouTube suffixes
+    patterns = [
+        r'\(Official\s*(Music\s*)?Video\)',
+        r'\(Official\s*Audio\)',
+        r'\(Lyric\s*Video\)',
+        r'\(Lyrics\)',
+        r'\[Official\s*(Music\s*)?Video\]',
+        r'\[Official\s*Audio\]',
+        r'\[Lyric\s*Video\]',
+        r'\[Lyrics\]',
+        r'\(HD\)',
+        r'\[HD\]',
+        r'\(4K\)',
+        r'\[4K\]',
+        r'\(Audio\)',
+        r'\[Audio\]',
+        r'\(Visualizer\)',
+        r'\[Visualizer\]',
+        r'【.*?】',
+        r'\|.*$',  # Remove everything after |
+    ]
+
+    cleaned = title
+    for pattern in patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    # Remove extra whitespace
+    cleaned = ' '.join(cleaned.split())
+    return cleaned.strip()
+
+
+def search_spotify(title):
+    """Search Spotify for a track and return the URL."""
+    token = get_spotify_token()
+    if not token:
+        return None
+
+    try:
+        import requests
+        import urllib.parse
+
+        cleaned_title = clean_title_for_search(title)
+        query = urllib.parse.quote(cleaned_title)
+
+        response = requests.get(
+            f"https://api.spotify.com/v1/search?q={query}&type=track&limit=1",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            tracks = data.get("tracks", {}).get("items", [])
+            if tracks:
+                return tracks[0]["external_urls"]["spotify"]
+    except Exception as e:
+        print(f"Error searching Spotify: {e}")
+    return None
 
 # Constants
 MAX_VIDEO_SIZE = 50 * MiB  # 50 MiB limit for regular Telegram bot API
@@ -669,9 +766,17 @@ def process_audio_download(chat_id, user_id, url):
         # Get audio duration
         duration = get_audio_duration(audio_path)
 
+        # Search for Spotify link
+        spotify_url = search_spotify(title)
+
         # Upload to Telegram
         msg = telegrame.send_message(TELEGRAM_API, chat_id, "Uploading audio...")
         add_status_message(chat_id, msg)
+
+        # Build caption
+        caption = f"Source: {clean_youtube_url(url)}"
+        if spotify_url:
+            caption += f"\nSpotify: {spotify_url}"
 
         with open(audio_path, 'rb') as audio_file:
             thumb_file = None
@@ -682,7 +787,7 @@ def process_audio_download(chat_id, user_id, url):
                 TELEGRAM_API.send_audio(
                     chat_id,
                     audio_file,
-                    caption=f"Source: {clean_youtube_url(url)}",
+                    caption=caption,
                     title=title,
                     duration=duration,
                     thumb=thumb_file,
