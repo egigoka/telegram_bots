@@ -7,3 +7,4 @@ secrets.py
 .idea/
 default.profraw
 configs/battery.json
+configs/ytdl_users.json
