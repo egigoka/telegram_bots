@@ -39,7 +39,7 @@ except ImportError:
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 # Spotify token cache
 SPOTIFY_TOKEN = {"token": None, "expires": 0}
@@ -111,7 +111,7 @@ def clean_title_for_search(title):
 
 
 def search_spotify(title):
-    """Search Spotify for a track and return the URL."""
+    """Search Spotify for a track and return track info dict."""
     token = get_spotify_token()
     if not token:
         return None
@@ -133,7 +133,13 @@ def search_spotify(title):
             data = response.json()
             tracks = data.get("tracks", {}).get("items", [])
             if tracks:
-                return tracks[0]["external_urls"]["spotify"]
+                track = tracks[0]
+                artists = ", ".join(a["name"] for a in track["artists"])
+                return {
+                    "url": track["external_urls"]["spotify"],
+                    "artist": artists,
+                    "name": track["name"]
+                }
     except Exception as e:
         print(f"Error searching Spotify: {e}")
     return None
@@ -767,7 +773,7 @@ def process_audio_download(chat_id, user_id, url):
         duration = get_audio_duration(audio_path)
 
         # Search for Spotify link
-        spotify_url = search_spotify(title)
+        spotify_info = search_spotify(title)
 
         # Upload to Telegram
         msg = telegrame.send_message(TELEGRAM_API, chat_id, "Uploading audio...")
@@ -775,8 +781,8 @@ def process_audio_download(chat_id, user_id, url):
 
         # Build caption
         caption = f"Source: {clean_youtube_url(url)}"
-        if spotify_url:
-            caption += f"\nSpotify: {spotify_url}"
+        if spotify_info:
+            caption += f"\n\nSpotify {spotify_info['artist']} - {spotify_info['name']}: {spotify_info['url']}"
 
         with open(audio_path, 'rb') as audio_file:
             thumb_file = None
