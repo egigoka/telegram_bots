@@ -12,10 +12,10 @@ import tempfile
 import re
 
 try:
-    from commands import File, Dir, Path, Time, Video, MiB, KiB, JsonDict
+    from commands import Path, Time, Video, MiB, KiB, JsonDict
 except ImportError:
     os.system("pip install git+https://github.com/egigoka/commands")
-    from commands import File, Dir, Path, Time, Video, MiB, KiB, JsonDict
+    from commands import Path, Time, Video, MiB, KiB, JsonDict
 
 try:
     import telebot
@@ -32,14 +32,22 @@ except ImportError:
     import telegrame
 
 try:
-    from secrets import YTDL_TELEGRAM_TOKEN, MY_CHAT_ID, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    from secrets import YTDL_TELEGRAM_TOKEN, MY_CHAT_ID
 except ImportError:
-    print("Error: YTDL_TELEGRAM_TOKEN, MY_CHAT_ID, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET must be defined in secrets.py")
+    print("Error: YTDL_TELEGRAM_TOKEN and MY_CHAT_ID must be defined in secrets.py")
     sys.exit(1)
+
+try:
+    from secrets import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    SPOTIFY_ENABLED = True
+except ImportError:
+    SPOTIFY_ENABLED = False
+    SPOTIFY_CLIENT_ID = None
+    SPOTIFY_CLIENT_SECRET = None
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "1.2.1"
+__version__ = "1.4.0"
 
 # Spotify token cache
 SPOTIFY_TOKEN = {"token": None, "expires": 0}
@@ -112,6 +120,9 @@ def clean_title_for_search(title):
 
 def search_spotify(title):
     """Search Spotify for a track and return track info dict."""
+    if not SPOTIFY_ENABLED:
+        return None
+
     token = get_spotify_token()
     if not token:
         return None
@@ -157,10 +168,11 @@ TELEGRAM_API = telebot.TeleBot(YTDL_TELEGRAM_TOKEN, threaded=False)
 CONFIG_DIR = Path.combine(os.path.dirname(os.path.abspath(__file__)), "configs")
 USERS_JSON_PATH = Path.combine(CONFIG_DIR, "ytdl_users.json")
 
-# Temporary storage for pending URL choices (user_id -> url)
+# Temporary storage for pending URL choices (user_id -> {url, timestamp})
 PENDING_CHOICES = {}
+PENDING_CHOICES_TTL = 3600  # 1 hour
 
-# Temporary storage for status messages to delete (user_id -> [message_ids])
+# Temporary storage for status messages to delete (chat_id -> [message_ids])
 STATUS_MESSAGES = {}
 
 
@@ -244,6 +256,11 @@ class UserManager:
 
 # Initialize user manager
 USER_MANAGER = UserManager(USERS_JSON_PATH)
+
+# Auto-approve admin on startup
+if YTDL_ADMIN_CHAT_ID not in USER_MANAGER.config["approved_users"]:
+    USER_MANAGER.config["approved_users"].append(YTDL_ADMIN_CHAT_ID)
+    USER_MANAGER.config.save()
 
 
 def add_status_message(chat_id, message):
@@ -540,6 +557,63 @@ def compress_video(video_path, temp_dir):
     return None, None, None
 
 
+@TELEGRAM_API.message_handler(commands=['help'])
+def handle_help(message):
+    """Handle /help command."""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    text = "Send a YouTube link to download video or audio."
+
+    # Show admin commands
+    if user_id == YTDL_ADMIN_CHAT_ID:
+        text += "\n\nAdmin commands:\n/revoke <user_id> - revoke user access"
+
+    telegrame.send_message(TELEGRAM_API, chat_id, text)
+
+
+@TELEGRAM_API.message_handler(commands=['revoke'])
+def handle_revoke(message):
+    """Handle /revoke command - admin only."""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    # Admin only
+    if user_id != YTDL_ADMIN_CHAT_ID:
+        telegrame.send_message(TELEGRAM_API, chat_id, "Admin only command.")
+        return
+
+    # Parse user ID from command
+    parts = message.text.split()
+    if len(parts) < 2:
+        telegrame.send_message(TELEGRAM_API, chat_id,
+                               "Usage: /revoke <user_id>")
+        return
+
+    try:
+        target_user_id = int(parts[1])
+    except ValueError:
+        telegrame.send_message(TELEGRAM_API, chat_id,
+                               "Invalid user ID. Must be a number.")
+        return
+
+    # Don't allow revoking admin
+    if target_user_id == YTDL_ADMIN_CHAT_ID:
+        telegrame.send_message(TELEGRAM_API, chat_id,
+                               "Cannot revoke admin access.")
+        return
+
+    # Remove from approved list
+    if target_user_id in USER_MANAGER.config["approved_users"]:
+        USER_MANAGER.config["approved_users"].remove(target_user_id)
+        USER_MANAGER.config.save()
+        telegrame.send_message(TELEGRAM_API, chat_id,
+                               f"User {target_user_id} access revoked.")
+    else:
+        telegrame.send_message(TELEGRAM_API, chat_id,
+                               f"User {target_user_id} was not in approved list.")
+
+
 @TELEGRAM_API.message_handler(commands=['start'])
 def handle_start(message):
     """Handle /start command."""
@@ -597,23 +671,33 @@ def handle_message(message):
 
     if USER_MANAGER.is_approved(user_id):
         # Show Video/Audio choice buttons
-        show_format_choice(chat_id, user_id, text)
+        show_format_choice(chat_id, user_id, text, approved=True)
     else:
-        # New user - request approval
-        request_approval(message, text)
+        # New user - show format choice first, then request approval
+        show_format_choice(chat_id, user_id, text, approved=False)
 
 
-def show_format_choice(chat_id, user_id, url):
+def show_format_choice(chat_id, user_id, url, approved=True):
     """Show inline buttons for Video/Audio choice."""
-    # Store URL for later
-    PENDING_CHOICES[user_id] = url
+    import time
 
-    # Create inline keyboard
+    # Clean old pending choices
+    now = time.time()
+    expired = [uid for uid, data in PENDING_CHOICES.items()
+               if now - data.get('timestamp', 0) > PENDING_CHOICES_TTL]
+    for uid in expired:
+        PENDING_CHOICES.pop(uid, None)
+
+    # Store URL for later with timestamp and approval status
+    PENDING_CHOICES[user_id] = {'url': url, 'timestamp': now, 'approved': approved}
+
+    # Create inline keyboard - different callback prefix for unapproved users
     markup = telebot.types.InlineKeyboardMarkup()
+    prefix = "dl" if approved else "req"
     video_btn = telebot.types.InlineKeyboardButton(
-        "Video", callback_data=f"dl_video_{user_id}")
+        "Video", callback_data=f"{prefix}_video_{user_id}")
     audio_btn = telebot.types.InlineKeyboardButton(
-        "Audio (MP3)", callback_data=f"dl_audio_{user_id}")
+        "Audio (MP3)", callback_data=f"{prefix}_audio_{user_id}")
     markup.row(video_btn, audio_btn)
 
     msg = telegrame.send_message(TELEGRAM_API, chat_id,
@@ -624,17 +708,18 @@ def show_format_choice(chat_id, user_id, url):
 
 @TELEGRAM_API.callback_query_handler(func=lambda call: call.data.startswith(('dl_video_', 'dl_audio_')))
 def handle_format_choice(call):
-    """Handle Video/Audio format choice."""
+    """Handle Video/Audio format choice for approved users."""
     parts = call.data.split('_')
     format_type = parts[1]  # 'video' or 'audio'
     user_id = int(parts[2])
     chat_id = call.message.chat.id
 
     # Get stored URL
-    url = PENDING_CHOICES.pop(user_id, None)
-    if not url:
+    pending_data = PENDING_CHOICES.pop(user_id, None)
+    if not pending_data:
         TELEGRAM_API.answer_callback_query(call.id, "Session expired. Please send the link again.")
         return
+    url = pending_data['url']
 
     # Delete the format choice message (it's already tracked in STATUS_MESSAGES)
     try:
@@ -654,12 +739,40 @@ def handle_format_choice(call):
         process_audio_download(chat_id, user_id, url)
 
 
-def request_approval(message, url, audio_only=False):
-    """Request admin approval for a new user."""
-    user_id = message.from_user.id
-    username = message.from_user.username or "N/A"
-    first_name = message.from_user.first_name or "N/A"
-    chat_id = message.chat.id
+@TELEGRAM_API.callback_query_handler(func=lambda call: call.data.startswith(('req_video_', 'req_audio_')))
+def handle_format_choice_unapproved(call):
+    """Handle Video/Audio format choice for unapproved users - sends approval request."""
+    parts = call.data.split('_')
+    format_type = parts[1]  # 'video' or 'audio'
+    user_id = int(parts[2])
+    chat_id = call.message.chat.id
+
+    # Get stored URL
+    pending_data = PENDING_CHOICES.pop(user_id, None)
+    if not pending_data:
+        TELEGRAM_API.answer_callback_query(call.id, "Session expired. Please send the link again.")
+        return
+    url = pending_data['url']
+    audio_only = (format_type == 'audio')
+
+    # Delete the format choice message
+    try:
+        TELEGRAM_API.delete_message(chat_id, call.message.message_id)
+        if chat_id in STATUS_MESSAGES and call.message.message_id in STATUS_MESSAGES[chat_id]:
+            STATUS_MESSAGES[chat_id].remove(call.message.message_id)
+    except Exception as e:
+        print(f"Failed to delete format choice message: {e}")
+
+    TELEGRAM_API.answer_callback_query(call.id)
+
+    # Now request approval with the format choice
+    request_approval_with_format(chat_id, user_id, call.from_user, url, audio_only)
+
+
+def request_approval_with_format(chat_id, user_id, user, url, audio_only=False):
+    """Request admin approval for a new user with format choice."""
+    username = user.username or "N/A"
+    first_name = user.first_name or "N/A"
 
     # Create inline keyboard with Approve/Deny buttons
     markup = telebot.types.InlineKeyboardMarkup()
@@ -671,11 +784,13 @@ def request_approval(message, url, audio_only=False):
 
     # Get video title for context
     title = get_video_title(url)
+    format_str = "Audio" if audio_only else "Video"
 
     admin_text = (f"New user request:\n\n"
                   f"User ID: {user_id}\n"
                   f"Username: @{username}\n"
                   f"Name: {first_name}\n"
+                  f"Format: {format_str}\n"
                   f"Video: {title}\n"
                   f"URL: {url}")
 
@@ -708,12 +823,17 @@ def handle_approval_callback(call):
         result_text = f"User {user_id} has been APPROVED."
 
         if pending:
-            # Notify user - they need to send the link again and choose format
+            # Notify user and process their queued request with chosen format
             try:
                 telegrame.send_message(TELEGRAM_API, user_id,
-                                       "Your access has been approved! Please send your YouTube link again.")
+                                       "Your access has been approved! Processing your request...")
+                # Process with the format they chose
+                if pending.get("audio_only", False):
+                    process_audio_download(user_id, user_id, pending["requested_url"])
+                else:
+                    process_download(user_id, user_id, pending["requested_url"])
             except Exception as e:
-                print(f"Error notifying approved user: {e}")
+                print(f"Error processing approved user request: {e}")
     else:
         pending = USER_MANAGER.deny_user(user_id)
         result_text = f"User {user_id} has been DENIED."
@@ -881,6 +1001,12 @@ def process_download(chat_id, user_id, url):
         # Get thumbnail
         thumbnail_path = get_thumbnail(url, temp_dir)
 
+        # Get video duration
+        try:
+            duration = int(Video.get_length(video_path))
+        except Exception:
+            duration = None
+
         # Upload to Telegram
         msg = telegrame.send_message(TELEGRAM_API, chat_id, "Uploading video...")
         add_status_message(chat_id, msg)
@@ -898,6 +1024,7 @@ def process_download(chat_id, user_id, url):
                     supports_streaming=True,
                     width=width,
                     height=height,
+                    duration=duration,
                     thumb=thumb_file,
                     timeout=300
                 )
