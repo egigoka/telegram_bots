@@ -8,3 +8,6 @@ secrets.py
 default.profraw
 configs/battery.json
 configs/ytdl_users.json
+ytdl_session.session
+ytdl_session.session-journal
+todo.txt
