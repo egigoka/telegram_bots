@@ -1,9 +1,9 @@
 #! python3
 # -*- coding: utf-8 -*-
 """
-YouTube Download Telegram Bot
-Downloads YouTube videos and uploads them to Telegram with admin-controlled access.
-Uses Telethon for large file uploads (up to 2GB).
+Video Download Telegram Bot
+Downloads videos from YouTube, Twitter/X, TikTok, Instagram, and many other sites.
+Uses yt-dlp for downloading and Telethon for large file uploads (up to 2GB).
 """
 
 import os
@@ -67,7 +67,7 @@ except ImportError:
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 
 # Shared aiohttp session (lazy initialization)
 _AIOHTTP_SESSION = None
@@ -344,20 +344,12 @@ def clean_youtube_url(url):
     return urllib.parse.urlunparse(parsed._replace(query=clean_query))
 
 
-def is_youtube_url(text):
-    """Check if the text is a valid YouTube URL."""
+def is_supported_url(text):
+    """Check if the text looks like a URL that yt-dlp might support."""
     if not text:
         return False
-    youtube_patterns = [
-        r'(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+',
-        r'(https?://)?(www\.)?youtube\.com/shorts/[\w-]+',
-        r'(https?://)?(www\.)?youtu\.be/[\w-]+',
-        r'(https?://)?(www\.)?youtube\.com/live/[\w-]+',
-    ]
-    for pattern in youtube_patterns:
-        if re.search(pattern, text):
-            return True
-    return False
+    # Accept any http/https URL - let yt-dlp decide if it's supported
+    return bool(re.match(r'https?://', text.strip()))
 
 
 def get_video_title(url):
@@ -883,7 +875,7 @@ async def handle_help(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
 
-    text = "Send a YouTube link to download video or audio."
+    text = "Send a video link to download video or audio."
 
     # Show admin commands
     if user_id == YTDL_ADMIN_CHAT_ID:
@@ -936,18 +928,14 @@ async def handle_start(message):
     user_id = message.from_user.id
 
     if USER_MANAGER.is_approved(user_id):
-        text = ("Welcome! Send me a YouTube link and I will ask whether you want video or audio.\n\n"
-                "Supported formats:\n"
-                "- youtube.com/watch?v=...\n"
-                "- youtu.be/...\n"
-                "- YouTube Shorts\n"
-                "- YouTube Live (recordings)")
+        text = ("Welcome! Send me a video link and I will ask whether you want video or audio.\n\n"
+                "Supports YouTube, Twitter/X, TikTok, Instagram, and many more sites.")
     elif USER_MANAGER.is_denied(user_id):
         text = "Sorry, your access request was denied."
     elif USER_MANAGER.is_pending(user_id):
         text = "Your access request is pending approval. Please wait."
     else:
-        text = ("Welcome! To use this bot, send me a YouTube link.\n"
+        text = ("Welcome! To use this bot, send me a video link.\n"
                 "Your first request will be sent to the admin for approval.")
 
     await send_message(chat_id, text)
@@ -961,9 +949,9 @@ async def handle_message(message):
     text = message.text.strip() if message.text else ""
     print(f"[RECV] from {user_id}: {text[:100]}{'...' if len(text) > 100 else ''}")
 
-    # Check if it's a YouTube URL
-    if not is_youtube_url(text):
-        await send_message(chat_id, "Please send a valid YouTube URL.")
+    # Check if it's a URL
+    if not is_supported_url(text):
+        await send_message(chat_id, "Please send a valid URL.")
         return
 
     # Forward to admin for monitoring
