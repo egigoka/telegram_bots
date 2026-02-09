@@ -20,36 +20,27 @@ import urllib.parse
 import base64
 import hashlib
 
-try:
-    from commands import Path, Time, Video, MiB, KiB, GiB, JsonDict
-except ImportError:
-    os.system("pip install git+https://github.com/egigoka/commands")
-    from commands import Path, Time, Video, MiB, KiB, GiB, JsonDict
+from commands import Path, Time, Video, MiB, KiB, GiB, JsonDict
 
 try:
     import telebot
     from telebot.async_telebot import AsyncTeleBot
 except ImportError:
-    from commands.pip9 import Pip
-    Pip.install("pytelegrambotapi")
-    import telebot
-    from telebot.async_telebot import AsyncTeleBot
+    print("install pytelegrambotapi")
+    sys.exit(1)
 
 try:
     from telethon import TelegramClient
     from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename, DocumentAttributeAudio
 except ImportError:
-    from commands.pip9 import Pip
-    Pip.install("telethon")
-    from telethon import TelegramClient
-    from telethon.tl.types import DocumentAttributeVideo, DocumentAttributeFilename, DocumentAttributeAudio
+    print("install telethon")
+    sys.exit(1)
 
 try:
     import aiohttp
 except ImportError:
-    from commands.pip9 import Pip
-    Pip.install("aiohttp")
-    import aiohttp
+    print("install aiohttp")
+    sys.exit(1)
 
 try:
     from secrets import YTDL_TELEGRAM_TOKEN, MY_CHAT_ID, APP_ID, APP_API_HASH
@@ -192,7 +183,7 @@ async def search_spotify(title):
 # Constants
 MAX_VIDEO_SIZE = 2 * GiB  # 2 GB limit with Telethon
 MIN_AUDIO_BITRATE = 32 * KiB
-MAX_AUDIO_BITRATE = 128 * KiB
+MAX_AUDIO_BITRATE = 320 * KiB
 BITRATE_SAFETY_MARGIN = 0.9
 
 # Telegram bot instance (async)
@@ -412,7 +403,7 @@ async def download_audio(url, temp_dir, max_retries=10):
 
     yt_dlp_command = [
         "yt-dlp",
-        "-f", "bestaudio",
+        "-f", "bestaudio/best",
         "-x",  # Extract audio
         "--audio-format", "mp3",
         "--audio-quality", "0",  # Best quality
