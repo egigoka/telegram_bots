@@ -58,7 +58,7 @@ except ImportError:
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "2.7.0"
+__version__ = "2.8.0"
 
 # Shared aiohttp session (lazy initialization)
 _AIOHTTP_SESSION = None
@@ -323,6 +323,87 @@ async def clear_status_messages(chat_id):
         except Exception as e:
             print(f"Failed to delete message {message_id}: {e}")
     STATUS_MESSAGES[chat_id] = []
+
+
+async def normalize_tiktok_url(url):
+    """Fix TikTok URLs: resolve short links and convert /photo/ to /video/.
+
+    Returns (normalized_url, is_photo_post).
+    """
+    is_photo = False
+
+    # Resolve TikTok short URLs (vt.tiktok.com, vm.tiktok.com, v.tiktok.com)
+    if re.match(r'https?://(vt|vm|v)\.tiktok\.com/', url):
+        try:
+            session = await get_aiohttp_session()
+            async with session.head(
+                url, allow_redirects=True,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                resolved = str(response.url)
+                print(f"[TIKTOK] Resolved short URL -> {resolved}")
+                url = resolved
+        except Exception as e:
+            print(f"[TIKTOK] Error resolving short URL: {e}")
+
+    # Convert /photo/ to /video/ - TikTok serves photo posts via /video/ endpoint too
+    if 'tiktok.com' in url and '/photo/' in url:
+        is_photo = True
+        url = url.replace('/photo/', '/video/')
+        print(f"[TIKTOK] Photo post detected, converted -> {url}")
+
+    return url, is_photo
+
+
+async def get_tiktok_photo(url, temp_dir):
+    """Fetch TikTok photo post image via oembed API. Returns file path or None."""
+    try:
+        oembed_url = f"https://www.tiktok.com/oembed?url={urllib.parse.quote(url, safe='')}"
+        session = await get_aiohttp_session()
+        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+
+        thumb_url = data.get("thumbnail_url")
+        if not thumb_url:
+            return None
+
+        async with session.get(thumb_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status != 200:
+                return None
+            content = await resp.read()
+
+        photo_path = os.path.join(temp_dir, "tiktok_photo.jpg")
+        with open(photo_path, "wb") as f:
+            f.write(content)
+        print(f"[TIKTOK] Downloaded photo: {len(content) / 1024:.0f} KB")
+        return photo_path
+    except Exception as e:
+        print(f"[TIKTOK] Error fetching photo: {e}")
+        return None
+
+
+def merge_image_audio(image_path, audio_path, output_path):
+    """Merge a still image with audio into an MP4 video using ffmpeg."""
+    command = [
+        "ffmpeg", "-y",
+        "-loop", "1",
+        "-i", image_path,
+        "-i", audio_path,
+        "-c:v", "libx264",
+        "-tune", "stillimage",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        output_path
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        print(f"[TIKTOK] ffmpeg merge failed: {result.stderr}")
+        return None
+    return output_path
 
 
 def clean_youtube_url(url):
@@ -961,12 +1042,29 @@ async def handle_message(message):
         await send_message(chat_id, "Your previous request is still pending approval. Please wait.")
         return
 
-    if USER_MANAGER.is_approved(user_id):
+    # Normalize TikTok URLs early to detect photo posts
+    url, is_tiktok_photo = await normalize_tiktok_url(text)
+
+    # Detect audio-only sources (skip format choice)
+    is_audio_only = bool(re.match(r'https?://music\.yandex\.(ru|com)', url))
+
+    if is_tiktok_photo:
+        # TikTok photo post: merge image + audio into video
+        if USER_MANAGER.is_approved(user_id):
+            await process_tiktok_photo(chat_id, user_id, url)
+        else:
+            await request_approval_with_format(chat_id, user_id, message.from_user, url, audio_only=True)
+    elif is_audio_only:
+        if USER_MANAGER.is_approved(user_id):
+            await process_audio_download(chat_id, user_id, url)
+        else:
+            await request_approval_with_format(chat_id, user_id, message.from_user, url, audio_only=True)
+    elif USER_MANAGER.is_approved(user_id):
         # Show Video/Audio choice buttons
-        await show_format_choice(chat_id, user_id, text, approved=True)
+        await show_format_choice(chat_id, user_id, url, approved=True)
     else:
         # New user - show format choice first, then request approval
-        await show_format_choice(chat_id, user_id, text, approved=False)
+        await show_format_choice(chat_id, user_id, url, approved=False)
 
 
 async def show_format_choice(chat_id, user_id, url, approved=True):
@@ -1152,9 +1250,95 @@ async def handle_approval_callback(call):
         print(f"Error updating admin message: {e}")
 
 
+async def process_tiktok_photo(chat_id, user_id, url):
+    """Download TikTok photo post: fetch image + audio, merge into MP4 video."""
+    print(f"[TIKTOK] Starting photo post download for user {user_id}")
+    temp_dir = tempfile.mkdtemp(prefix="ytdl_tiktok_")
+
+    try:
+        msg = await send_message(chat_id, "Downloading TikTok photo post...")
+        add_status_message(chat_id, msg)
+
+        # Download audio and fetch photo in parallel
+        print("[TIKTOK] Downloading audio and photo...")
+        audio_task = download_audio(url, temp_dir)
+        photo_task = get_tiktok_photo(url, temp_dir)
+        audio_path, photo_path = await asyncio.gather(audio_task, photo_task)
+
+        if not audio_path:
+            await send_message(chat_id, "Failed to download audio. Please try again later.")
+            await clear_status_messages(chat_id)
+            return
+
+        if not photo_path:
+            # Fallback: send audio only if photo fetch failed
+            print("[TIKTOK] Photo fetch failed, falling back to audio only")
+            await clear_status_messages(chat_id)
+            await process_audio_download(chat_id, user_id, url)
+            return
+
+        # Merge image + audio into MP4
+        msg = await send_message(chat_id, "Merging photo and audio...")
+        add_status_message(chat_id, msg)
+        video_path = os.path.join(temp_dir, "tiktok_video.mp4")
+        print("[TIKTOK] Merging image + audio...")
+        result = await asyncio.to_thread(merge_image_audio, photo_path, audio_path, video_path)
+        if not result:
+            print("[TIKTOK] Merge failed, falling back to audio only")
+            await clear_status_messages(chat_id)
+            await process_audio_download(chat_id, user_id, url)
+            return
+
+        file_size = os.path.getsize(video_path)
+        print(f"[TIKTOK] Merged video: {file_size / MiB:.1f} MiB")
+
+        # Get video info
+        title = await asyncio.to_thread(get_video_title, url)
+        duration = await asyncio.to_thread(get_audio_duration, audio_path)
+        width, height = await asyncio.to_thread(Video.get_resolution, video_path)
+
+        # Upload
+        msg = await send_message(chat_id, f"Uploading video ({file_size / MiB:.0f} MiB)...")
+        add_status_message(chat_id, msg)
+
+        caption = f"{title}\n\nSource: {clean_youtube_url(url)}"
+        await send_video_telethon(
+            chat_id, video_path, caption, width, height, duration,
+            photo_path,  # use the photo as thumbnail too
+            status_message_id=msg.message_id, file_size=file_size
+        )
+        print("[TIKTOK] Upload complete")
+
+        await clear_status_messages(chat_id)
+        print(f"[TIKTOK] Done for user {user_id}")
+
+        if chat_id != YTDL_ADMIN_CHAT_ID:
+            await send_message(YTDL_ADMIN_CHAT_ID, f"TikTok photo video sent to user {user_id}: {title}")
+
+    except UploadFailedError as e:
+        print(f"Upload failed: {e}")
+        await send_message(chat_id, f"Upload failed after multiple retries. Please try again later.\n\nError: {e}")
+        await send_message(YTDL_ADMIN_CHAT_ID, f"Upload failed for user {user_id}:\n{url}\n\n{e}")
+
+    except Exception as e:
+        print(f"Error processing TikTok photo: {e}")
+        traceback.print_exc()
+        await send_message(chat_id, "An error occurred. Please try again.")
+        await send_message(YTDL_ADMIN_CHAT_ID, f"Error for user {user_id}:\n{url}\n\n{e}")
+
+    finally:
+        STATUS_MESSAGES.pop(chat_id, None)
+        try:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+        except Exception as e:
+            print(f"Error cleaning up temp dir: {e}")
+
+
 async def process_audio_download(chat_id, user_id, url):
     """Download and send audio only."""
     print(f"[AUDIO] Starting download for user {user_id}")
+    url, _ = await normalize_tiktok_url(url)
     temp_dir = tempfile.mkdtemp(prefix="ytdl_")
 
     try:
@@ -1264,6 +1448,7 @@ async def process_audio_download(chat_id, user_id, url):
 async def process_download(chat_id, user_id, url):
     """Main video download and processing function."""
     print(f"[VIDEO] Starting download for user {user_id}")
+    url, _ = await normalize_tiktok_url(url)
     temp_dir = tempfile.mkdtemp(prefix="ytdl_")
 
     try:
@@ -1434,6 +1619,7 @@ CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "download_c
 async def test_download_only(url):
     """Download-only mode: download video and metadata, keep files for later processing."""
     print(f"YouTube Download Bot v{__version__} DOWNLOAD-ONLY MODE")
+    url, _ = await normalize_tiktok_url(url)
     print(f"URL: {url}")
 
     try:
