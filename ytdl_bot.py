@@ -58,7 +58,7 @@ except ImportError:
 
 YTDL_ADMIN_CHAT_ID = MY_CHAT_ID
 
-__version__ = "2.8.0"
+__version__ = "2.9.1"
 
 # Shared aiohttp session (lazy initialization)
 _AIOHTTP_SESSION = None
@@ -478,9 +478,26 @@ def get_thumbnail(url, folder):
     return None
 
 
+async def notify_admin(chat_id, text):
+    """Send a message to admin, unless the chat is already the admin chat."""
+    if chat_id != YTDL_ADMIN_CHAT_ID:
+        await send_message(YTDL_ADMIN_CHAT_ID, text)
+
+
+def truncate_error(text, max_len=3500):
+    """Truncate error text to fit within Telegram's 4096 char message limit."""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "\n...(truncated)"
+
+
 async def download_audio(url, temp_dir, max_retries=10):
-    """Download YouTube audio only using yt-dlp with robust retry logic."""
+    """Download YouTube audio only using yt-dlp with robust retry logic.
+
+    Returns (path, None) on success or (None, error_string) on failure.
+    """
     output_path = os.path.join(temp_dir, 'audio.mp3')
+    last_error = "Unknown error"
 
     yt_dlp_command = [
         "yt-dlp",
@@ -503,11 +520,14 @@ async def download_audio(url, temp_dir, max_retries=10):
             )
             if result.returncode == 0 and os.path.exists(output_path):
                 print(f"[AUDIO] Download successful: {output_path}")
-                return output_path
+                return output_path, None
+            last_error = result.stderr.strip() or f"yt-dlp exited with code {result.returncode}"
             print(f"[AUDIO] Attempt {attempt + 1} failed: {result.stderr}")
         except subprocess.TimeoutExpired:
+            last_error = "Download timed out (5 minutes)"
             print(f"[AUDIO] Attempt {attempt + 1} timed out")
         except Exception as e:
+            last_error = str(e)
             print(f"[AUDIO] Attempt {attempt + 1} error: {e}")
 
         if attempt >= max_retries:
@@ -517,16 +537,20 @@ async def download_audio(url, temp_dir, max_retries=10):
         print("[AUDIO] Waiting for internet connection...")
         if not await wait_for_internet(max_wait=300, check_interval=10):
             print("[AUDIO] Internet connection not restored after 5 minutes")
-            return None
+            return None, "Internet connection not restored after 5 minutes"
 
         print(f"[AUDIO] Retrying download (attempt {attempt + 2}/{max_retries + 1})...")
 
-    return None
+    return None, last_error
 
 
 async def download_video(url, temp_dir, max_retries=10):
-    """Download YouTube video using yt-dlp with robust retry logic."""
+    """Download YouTube video using yt-dlp with robust retry logic.
+
+    Returns (path, None) on success or (None, error_string) on failure.
+    """
     output_path = os.path.join(temp_dir, 'video.mp4')
+    last_error = "Unknown error"
 
     yt_dlp_command = [
         "yt-dlp",
@@ -547,11 +571,14 @@ async def download_video(url, temp_dir, max_retries=10):
             )
             if result.returncode == 0 and os.path.exists(output_path):
                 print(f"[VIDEO] Download successful: {output_path}")
-                return output_path
+                return output_path, None
+            last_error = result.stderr.strip() or f"yt-dlp exited with code {result.returncode}"
             print(f"[VIDEO] Attempt {attempt + 1} failed: {result.stderr}")
         except subprocess.TimeoutExpired:
+            last_error = "Download timed out (10 minutes)"
             print(f"[VIDEO] Attempt {attempt + 1} timed out")
         except Exception as e:
+            last_error = str(e)
             print(f"[VIDEO] Attempt {attempt + 1} error: {e}")
 
         if attempt >= max_retries:
@@ -561,11 +588,11 @@ async def download_video(url, temp_dir, max_retries=10):
         print("[VIDEO] Waiting for internet connection...")
         if not await wait_for_internet(max_wait=300, check_interval=10):
             print("[VIDEO] Internet connection not restored after 5 minutes")
-            return None
+            return None, "Internet connection not restored after 5 minutes"
 
         print(f"[VIDEO] Retrying download (attempt {attempt + 2}/{max_retries + 1})...")
 
-    return None
+    return None, last_error
 
 
 def get_new_video_info(video_path):
@@ -1263,10 +1290,13 @@ async def process_tiktok_photo(chat_id, user_id, url):
         print("[TIKTOK] Downloading audio and photo...")
         audio_task = download_audio(url, temp_dir)
         photo_task = get_tiktok_photo(url, temp_dir)
-        audio_path, photo_path = await asyncio.gather(audio_task, photo_task)
+        audio_result, photo_path = await asyncio.gather(audio_task, photo_task)
+        audio_path, audio_error = audio_result
 
         if not audio_path:
-            await send_message(chat_id, "Failed to download audio. Please try again later.")
+            error_detail = truncate_error(audio_error or "Unknown error")
+            await send_message(chat_id, f"Failed to download audio.\n\n{error_detail}")
+            await notify_admin(chat_id, f"Audio download failed for user {user_id}:\n{url}\n\n{error_detail}")
             await clear_status_messages(chat_id)
             return
 
@@ -1312,19 +1342,19 @@ async def process_tiktok_photo(chat_id, user_id, url):
         await clear_status_messages(chat_id)
         print(f"[TIKTOK] Done for user {user_id}")
 
-        if chat_id != YTDL_ADMIN_CHAT_ID:
-            await send_message(YTDL_ADMIN_CHAT_ID, f"TikTok photo video sent to user {user_id}: {title}")
+        await notify_admin(chat_id, f"TikTok photo video sent to user {user_id}: {title}")
 
     except UploadFailedError as e:
         print(f"Upload failed: {e}")
         await send_message(chat_id, f"Upload failed after multiple retries. Please try again later.\n\nError: {e}")
-        await send_message(YTDL_ADMIN_CHAT_ID, f"Upload failed for user {user_id}:\n{url}\n\n{e}")
+        await notify_admin(chat_id, f"Upload failed for user {user_id}:\n{url}\n\n{e}")
 
     except Exception as e:
         print(f"Error processing TikTok photo: {e}")
         traceback.print_exc()
-        await send_message(chat_id, "An error occurred. Please try again.")
-        await send_message(YTDL_ADMIN_CHAT_ID, f"Error for user {user_id}:\n{url}\n\n{e}")
+        tb = truncate_error(traceback.format_exc())
+        await send_message(chat_id, f"Error:\n{tb}")
+        await notify_admin(chat_id, f"Error for user {user_id}:\n{url}\n\n{tb}")
 
     finally:
         STATUS_MESSAGES.pop(chat_id, None)
@@ -1350,9 +1380,11 @@ async def process_audio_download(chat_id, user_id, url):
 
         # Download audio
         print("[AUDIO] Starting yt-dlp download...")
-        audio_path = await download_audio(url, temp_dir)
+        audio_path, dl_error = await download_audio(url, temp_dir)
         if not audio_path:
-            await send_message(chat_id, "Failed to download audio. Please try again later.")
+            error_detail = truncate_error(dl_error or "Unknown error")
+            await send_message(chat_id, f"Failed to download audio.\n\n{error_detail}")
+            await notify_admin(chat_id, f"Audio download failed for user {user_id}:\n{url}\n\n{error_detail}")
             await clear_status_messages(chat_id)
             return
         print("[AUDIO] Download complete")
@@ -1414,8 +1446,7 @@ async def process_audio_download(chat_id, user_id, url):
         print(f"[AUDIO] Done for user {user_id}")
 
         # Notify admin
-        if chat_id != YTDL_ADMIN_CHAT_ID:
-            await send_message(YTDL_ADMIN_CHAT_ID, f"Audio sent to user {user_id}: {title}")
+        await notify_admin(chat_id, f"Audio sent to user {user_id}: {title}")
 
     except UploadFailedError as e:
         error_msg = f"Upload failed: {str(e)}"
@@ -1423,18 +1454,15 @@ async def process_audio_download(chat_id, user_id, url):
 
         await send_message(chat_id,
                            f"Upload failed after multiple retries. Please try again later.\n\nError: {e}")
-        await send_message(YTDL_ADMIN_CHAT_ID,
-                           f"Upload failed for user {user_id}:\n{url}\n\n{error_msg}")
+        await notify_admin(chat_id, f"Upload failed for user {user_id}:\n{url}\n\n{error_msg}")
 
     except Exception as e:
         error_msg = f"Error processing audio: {str(e)}"
         print(error_msg)
         traceback.print_exc()
-
-        await send_message(chat_id,
-                           "An error occurred while processing your audio. Please try again.")
-        await send_message(YTDL_ADMIN_CHAT_ID,
-                           f"Error for user {user_id}:\n{url}\n\n{error_msg}")
+        tb = truncate_error(traceback.format_exc())
+        await send_message(chat_id, f"Error:\n{tb}")
+        await notify_admin(chat_id, f"Error for user {user_id}:\n{url}\n\n{tb}")
 
     finally:
         STATUS_MESSAGES.pop(chat_id, None)
@@ -1460,9 +1488,11 @@ async def process_download(chat_id, user_id, url):
 
         # Download video
         print("[VIDEO] Starting yt-dlp download...")
-        video_path = await download_video(url, temp_dir)
+        video_path, dl_error = await download_video(url, temp_dir)
         if not video_path:
-            await send_message(chat_id, "Failed to download video. Please try again later.")
+            error_detail = truncate_error(dl_error or "Unknown error")
+            await send_message(chat_id, f"Failed to download video.\n\n{error_detail}")
+            await notify_admin(chat_id, f"Video download failed for user {user_id}:\n{url}\n\n{error_detail}")
             await clear_status_messages(chat_id)
             return
         print("[VIDEO] Download complete")
@@ -1538,8 +1568,7 @@ async def process_download(chat_id, user_id, url):
         print(f"[VIDEO] Done for user {user_id}")
 
         # Notify admin
-        if chat_id != YTDL_ADMIN_CHAT_ID:
-            await send_message(YTDL_ADMIN_CHAT_ID, f"Video sent to user {user_id}: {title}")
+        await notify_admin(chat_id, f"Video sent to user {user_id}: {title}")
 
     except UploadFailedError as e:
         error_msg = f"Upload failed: {str(e)}"
@@ -1547,18 +1576,15 @@ async def process_download(chat_id, user_id, url):
 
         await send_message(chat_id,
                            f"Upload failed after multiple retries. Please try again later.\n\nError: {e}")
-        await send_message(YTDL_ADMIN_CHAT_ID,
-                           f"Upload failed for user {user_id}:\n{url}\n\n{error_msg}")
+        await notify_admin(chat_id, f"Upload failed for user {user_id}:\n{url}\n\n{error_msg}")
 
     except Exception as e:
         error_msg = f"Error processing video: {str(e)}"
         print(error_msg)
         traceback.print_exc()
-
-        await send_message(chat_id,
-                           "An error occurred while processing your video. Please try again.")
-        await send_message(YTDL_ADMIN_CHAT_ID,
-                           f"Error for user {user_id}:\n{url}\n\n{error_msg}")
+        tb = truncate_error(traceback.format_exc())
+        await send_message(chat_id, f"Error:\n{tb}")
+        await notify_admin(chat_id, f"Error for user {user_id}:\n{url}\n\n{tb}")
 
     finally:
         STATUS_MESSAGES.pop(chat_id, None)
@@ -1642,9 +1668,9 @@ async def test_download_only(url):
 
         # Download video
         print("[DOWNLOAD] Starting yt-dlp download...")
-        video_path = await download_video(url, download_dir)
+        video_path, dl_error = await download_video(url, download_dir)
         if not video_path:
-            print("[DOWNLOAD] FAILED to download video")
+            print(f"[DOWNLOAD] FAILED to download video: {dl_error}")
             return None
 
         file_size = os.path.getsize(video_path)
