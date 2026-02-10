@@ -22,29 +22,11 @@ __version__ = "2.6.5"
 
 my_chat_id = 5328715
 
-# change version
-if OS.hostname == "EGGG-HOST-2019":
-    import re
-    filepath = Path.safe__file__(__file__)
-    content = File.read(filepath)
-    lines = Str.nl(content)
-    for cnt, line in enumerate(lines):
-        if "__version__" in line:
-            regexp = re.compile(r"(\d+)(?!.*\d)")
-            last_ver = re.findall(r"(\d+)(?!.*\d)", line)
-            replace = str(int(last_ver[0])+1)
-            new = re.sub(r"(\d+)(?!.*\d)", replace, line)
-            lines[cnt] = new
-            break
-    new_content = "\r\n".join(lines)
-    File.write(filepath, new_content, mode="w")
-# end changing version
-
 class State:
     def __init__(self, chat_id):
         f = Path.safe__file__(os.path.split(__file__)[0])
         json_path = Path.combine(f, "configs", f"telegram_bot_todoist_{chat_id}.json")
-        self.config_json = Json(json_path)
+        self.config_json = JsonDict(json_path)
 
         self.getting_project_name = False
         self.getting_item_name = False
@@ -153,7 +135,7 @@ class Users:
     def __init__(self):
         f = Path.safe__file__(os.path.split(__file__)[0])
         json_path = Path.combine(f, "configs", "telegram_bot_todoist_users_secrets.json")
-        self.secrets = Json(json_path)
+        self.secrets = JsonDict(json_path)
 
         self.todoist = {}  # place to store Todoist objects
         self.state = {}  # place to store State objects
