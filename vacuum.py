@@ -44,8 +44,8 @@ HOSTNAME = OS.hostname
 
 
 STATUS_MAP = {
-    1: "Sweeping",
-    2: "Idle",
+    1: "Idle",
+    2: "Sweeping",
     3: "Paused",
     4: "Error",
     5: "Charging",
