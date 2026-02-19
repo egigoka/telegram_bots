@@ -27,10 +27,10 @@ except ImportError:
     print("install python-miio")
     sys.exit(1)
 try:
-    from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID
+    from secrets import BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID, VACUUM_IP, VACUUM_TOKEN
 except ImportError:
     import sys
-    print("create secrets.py with BATTERY_TELEGRAM_TOKEN and MY_CHAT_ID")
+    print("create secrets.py with BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID, VACUUM_IP and VACUUM_TOKEN")
     sys.exit(1)
 
 __version__ = "0.0.1"
