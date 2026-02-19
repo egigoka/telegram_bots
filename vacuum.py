@@ -96,7 +96,7 @@ def check_vacuum():
         print(f"now = {now_battery}%, {status_name(now_status)}")
     if PREVIOUS:
         if DEBUG:
-            print(f"previous = {PREVIOUS.get('battery', 'N/A')}%, {status_name(PREVIOUS.get('status', 'N/A'))}")
+            print(f"previous = {PREVIOUS['battery']}%, {status_name(PREVIOUS['status'])}")
     else:
         save_previous(output)
         return
@@ -109,7 +109,7 @@ def check_vacuum():
     diff = abs(now_battery - previous_battery)
 
     changed = diff > 10 \
-        or PREVIOUS.get('status') != now_status
+        or PREVIOUS['status'] != now_status
 
     if changed:
         message = f"{HOSTNAME} vacuum: {now_battery}%, {status_name(now_status)}"
