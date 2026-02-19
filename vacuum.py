@@ -1,7 +1,5 @@
 #! python3
 # -*- coding: utf-8 -*-
-import datetime
-
 try:
     from commands import *
 except ImportError:
@@ -34,7 +32,7 @@ except ImportError:
     print("create secrets.py with BATTERY_TELEGRAM_TOKEN, MY_CHAT_ID, VACUUM_IP and VACUUM_TOKEN")
     sys.exit(1)
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 ONCE = "--once" in OS.args
 DEBUG = "--debug" in OS.args
@@ -88,8 +86,7 @@ def check_vacuum():
     try:
         output = get_vacuum_struct()
     except DeviceException as e:
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{now}] vacuum unreachable: {e}")
+        print(f"vacuum unreachable: {e}")
         return
 
     if DEBUG:
@@ -98,8 +95,7 @@ def check_vacuum():
     now_battery = output['battery']
     now_status = output['status']
 
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{now}] vacuum: {now_battery}%, {status_name(now_status)}")
+    print(f"vacuum: {now_battery}%, {status_name(now_status)}")
 
     if DEBUG:
         print(f"now = {now_battery}%, {status_name(now_status)}")
