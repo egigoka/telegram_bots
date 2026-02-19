@@ -92,6 +92,9 @@ def check_vacuum():
     now_battery = output['battery']
     now_status = output['status']
 
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{now}] vacuum: {now_battery}%, {status_name(now_status)}")
+
     if DEBUG:
         print(f"now = {now_battery}%, {status_name(now_status)}")
     if PREVIOUS:
