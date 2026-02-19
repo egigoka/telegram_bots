@@ -22,6 +22,7 @@ except ImportError:
     sys.exit(1)
 try:
     from miio import Device
+    from miio.exceptions import DeviceException
 except ImportError:
     import sys
     print("install python-miio")
@@ -84,7 +85,12 @@ def status_name(code):
 
 
 def check_vacuum():
-    output = get_vacuum_struct()
+    try:
+        output = get_vacuum_struct()
+    except DeviceException as e:
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{now}] vacuum unreachable: {e}")
+        return
 
     if DEBUG:
         print(output)
