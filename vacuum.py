@@ -37,7 +37,7 @@ __version__ = "0.0.2"
 ONCE = "--once" in OS.args
 DEBUG = "--debug" in OS.args
 PREVIOUS = JsonDict("./configs/vacuum.json")
-RUN_EVERY = 300
+RUN_EVERY = 30
 HOSTNAME = OS.hostname
 
 
