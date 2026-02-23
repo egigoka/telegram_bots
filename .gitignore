@@ -11,3 +11,5 @@ configs/ytdl_users.json
 ytdl_session.session
 ytdl_session.session-journal
 todo.txt
+configs/
+*.session
