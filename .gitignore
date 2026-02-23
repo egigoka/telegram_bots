@@ -13,3 +13,4 @@ ytdl_session.session-journal
 todo.txt
 configs/
 *.session
+.coverage
