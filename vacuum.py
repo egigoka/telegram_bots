@@ -85,7 +85,7 @@ def status_name(code):
 def check_vacuum():
     try:
         output = get_vacuum_struct()
-    except DeviceException as e:
+    except (DeviceException, TypeError) as e:
         print(f"vacuum unreachable: {e}")
         return
 
