@@ -111,9 +111,9 @@ def check_vacuum():
     except (ValueError, KeyError):
         previous_battery = 0
 
-    diff = abs(now_battery - previous_battery)
+    battery_bucket_changed = (now_battery // 10) != (previous_battery // 10)
 
-    changed = diff > 10 \
+    changed = battery_bucket_changed \
         or PREVIOUS['status'] != now_status
 
     if changed:
