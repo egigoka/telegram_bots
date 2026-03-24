@@ -428,7 +428,7 @@ def get_video_title(url):
     """Get video title using yt-dlp."""
     try:
         result = subprocess.run(
-            ["yt-dlp", "--get-title", url],
+            ["yt-dlp", "--remote-components", "ejs:github", "--get-title", url],
             text=True,
             capture_output=True,
             timeout=30
@@ -461,6 +461,7 @@ def get_thumbnail(url, folder):
     try:
         command = [
             "yt-dlp",
+            "--remote-components", "ejs:github",
             "-o", os.path.join(folder, "_thumbnail.%(ext)s"),
             "--write-thumbnail",
             "--skip-download",
@@ -501,6 +502,7 @@ async def download_audio(url, temp_dir, max_retries=10):
 
     yt_dlp_command = [
         "yt-dlp",
+        "--remote-components", "ejs:github",
         "-f", "bestaudio/best",
         "-x",  # Extract audio
         "--audio-format", "mp3",
@@ -554,6 +556,7 @@ async def download_video(url, temp_dir, max_retries=10):
 
     yt_dlp_command = [
         "yt-dlp",
+        "--remote-components", "ejs:github",
         "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         "--merge-output-format", "mp4",
         "-o", output_path,
