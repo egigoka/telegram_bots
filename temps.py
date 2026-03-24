@@ -1,6 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 import datetime
+import json
 import os
 import time as time_module
 from collections import defaultdict
@@ -22,17 +23,21 @@ except ImportError:
 import telegrame
 from secrets import TEMPS_TELEGRAM_TOKEN, MY_CHAT_ID
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 
-IGNORED_SENSORS = []
-IGNORED_HARD_DRIVES_TEMPERATURE = []
-IGNORED_SYSTEMD_SERVICES = []
-OUTPUT_ALL_SENSORS = False
-RUN_EVERY = 300
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temps_config.json")
+with open(_CONFIG_PATH) as _f:
+    _config = json.load(_f)
 
-CPU_REPORT_SAMPLES = 100
-CPU_REPORT_DELAY = 0.5
-CPU_REPORT_THRESHOLD = 10.0
+IGNORED_SENSORS = _config.get("IGNORED_SENSORS", [])
+IGNORED_HARD_DRIVES_TEMPERATURE = _config.get("IGNORED_HARD_DRIVES_TEMPERATURE", [])
+IGNORED_SYSTEMD_SERVICES = _config.get("IGNORED_SYSTEMD_SERVICES", [])
+OUTPUT_ALL_SENSORS = _config.get("OUTPUT_ALL_SENSORS", False)
+RUN_EVERY = _config.get("RUN_EVERY", 300)
+
+CPU_REPORT_SAMPLES = _config.get("CPU_REPORT_SAMPLES", 100)
+CPU_REPORT_DELAY = _config.get("CPU_REPORT_DELAY", 0.5)
+CPU_REPORT_THRESHOLD = _config.get("CPU_REPORT_THRESHOLD", 10.0)
 _last_cpu_report_date = None
 
 TELEGRAM_API = telebot.TeleBot(TEMPS_TELEGRAM_TOKEN, threaded=False)
@@ -380,8 +385,10 @@ def failed_systemd_services(ignore_services=None):
             to_check.append(service_name)
 
     for file in to_check:
+        if ignore_services is not None and file in ignore_services:
+            continue
         status = Console.get_output("systemctl", "status", "-l", file)
-        
+
         active, triggered_by, since, since_time, since_delta = get_systemctl_properties(status)
 
         if should_skip_service(active, triggered_by, since_delta, RUN_EVERY):
