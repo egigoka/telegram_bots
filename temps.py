@@ -542,7 +542,7 @@ def safe_threads_run():
     
     threads = Threading()
 
-    if "--no-receive" not in OS.args:
+    if "--no-receive" not in OS.args and not _config.get("NO_RECEIVE", False):
         threads.add(telegrame.very_safe_start_bot, args=(_start_bot_receiver,))
     threads.add(telegrame.very_safe_start_bot, args=(_start_bot_sender,))
 
