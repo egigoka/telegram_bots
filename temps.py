@@ -1,6 +1,9 @@
 #! python3
 # -*- coding: utf-8 -*-
 import datetime
+import os
+import time as time_module
+from collections import defaultdict
 
 try:
     from commands import *
@@ -27,6 +30,11 @@ IGNORED_SYSTEMD_SERVICES = []
 OUTPUT_ALL_SENSORS = False
 RUN_EVERY = 300
 
+CPU_REPORT_SAMPLES = 100
+CPU_REPORT_DELAY = 0.5
+CPU_REPORT_THRESHOLD = 10.0
+_last_cpu_report_date = None
+
 TELEGRAM_API = telebot.TeleBot(TEMPS_TELEGRAM_TOKEN, threaded=False)
 
 print_original = print
@@ -42,18 +50,48 @@ def get_list_of_disks():
 
 def get_drive_temps(disks):
     """
-    Get the list of disks in Linux.
+    Get drive temperatures using smartctl.
 
     Returns:
-    A list of strings, where each string is the output of the `hddtemp /dev/disk_name` command.
+    A string with one line per disk in the format:
+    /dev/sdX: Model Name: 42°C
     """
-    # Get the output of the `hddtemp /dev/disk_name` command for each disk.
+    import subprocess
     outputs = []
     for disk in disks:
-        output = Console.get_output('hddtemp', disk)
-        outputs.append(output)
+        try:
+            result = subprocess.run(
+                ["smartctl", "-A", "-i", disk],
+                capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout
+            # Get model name
+            model = "Unknown"
+            for line in output.splitlines():
+                if "Device Model" in line or "Product" in line:
+                    model = line.split(":", 1)[1].strip()
+                    break
+            # Get temperature
+            temp = None
+            for line in output.splitlines():
+                if "Temperature_Celsius" in line or "Airflow_Temp" in line:
+                    parts = line.split()
+                    temp = parts[9] if len(parts) >= 10 else None
+                    break
+            if temp is None:
+                for line in output.splitlines():
+                    if "Current Drive Temperature" in line:
+                        temp_parts = line.split()
+                        for i, p in enumerate(temp_parts):
+                            if p == "C" and i > 0:
+                                temp = temp_parts[i - 1]
+                                break
+            if temp is not None and temp != "0":
+                outputs.append(f"{disk}: {model}: {temp}°C")
+        except Exception:
+            pass
 
-    return "".join(outputs)
+    return "\n".join(outputs)
 
 
 def remove_useless_parts(input_strings):
@@ -207,11 +245,11 @@ def get_sensors_data(output_all, ignore_devices=None):
 
 
 def parse_hard_drive_line(line):
+    # Format: /dev/sdX: Model Name: 42°C
     parts = line.split(':')
     disk_device = parts[0].strip()
-    disk_name = parts[1].strip()
-    disk_info = parts[2].strip()
-
+    disk_name = parts[1].strip() if len(parts) > 1 else "Unknown"
+    disk_info = parts[2].strip() if len(parts) > 2 else "0°C"
 
     # Initialize min and max
     min_val = 5
@@ -219,10 +257,7 @@ def parse_hard_drive_line(line):
     status = 'OK'
 
     # Extract the temperature value
-    if disk_info == "S.M.A.R.T. not available":
-        temp_value = min_val
-    else:
-        temp_value = Str.get_integers(disk_info)[0]
+    temp_value = Str.get_integers(disk_info)[0]
 
     # Check if the current value is within the range
     if (temp_value < min_val) or (temp_value > max_val):
@@ -359,6 +394,82 @@ def failed_systemd_services(ignore_services=None):
     return outputs
 
 
+def _cpu_get_cwd(pid):
+    try:
+        return os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        return "?"
+
+
+def _cpu_sample_processes():
+    import subprocess
+    result = subprocess.run(
+        ["ps", "-eo", "pid,%cpu,comm,args", "--no-headers"],
+        capture_output=True, text=True
+    )
+    procs = []
+    for line in result.stdout.strip().splitlines():
+        parts = line.split(None, 3)
+        if len(parts) < 4:
+            continue
+        pid, cpu, name, cmd = parts[0], float(parts[1]), parts[2], parts[3]
+        cwd = _cpu_get_cwd(pid)
+        procs.append((pid, cpu, name, cmd, cwd))
+    return procs
+
+
+def get_cpu_report():
+    global _last_cpu_report_date
+    today = datetime.date.today()
+    if _last_cpu_report_date == today:
+        return None
+    _last_cpu_report_date = today
+
+    by_name = defaultdict(lambda: {"samples": 0, "total_cpu": 0.0, "max_cpu": 0.0, "pids": set()})
+    by_cmd = defaultdict(lambda: {"samples": 0, "total_cpu": 0.0, "max_cpu": 0.0, "pids": set(), "cwds": set()})
+
+    for i in range(CPU_REPORT_SAMPLES):
+        for pid, cpu, name, cmd, cwd in _cpu_sample_processes():
+            if cpu < CPU_REPORT_THRESHOLD:
+                continue
+            e = by_name[name]
+            e["samples"] += 1
+            e["total_cpu"] += cpu
+            e["max_cpu"] = max(e["max_cpu"], cpu)
+            e["pids"].add(pid)
+
+            e = by_cmd[cmd]
+            e["samples"] += 1
+            e["total_cpu"] += cpu
+            e["max_cpu"] = max(e["max_cpu"], cpu)
+            e["pids"].add(pid)
+            e["cwds"].add(cwd)
+        time_module.sleep(CPU_REPORT_DELAY)
+
+    report = []
+    report.append(f"CPU Report — {CPU_REPORT_SAMPLES} samples, {CPU_REPORT_DELAY}s interval, threshold >= {CPU_REPORT_THRESHOLD}%")
+    report.append("=" * 60)
+
+    report.append("\nBy process name:\n")
+    report.append(f"{'Name':<25} {'Seen':>5} {'Avg%':>6} {'Max%':>6} {'PIDs':>5}")
+    report.append("-" * 55)
+    for name, d in sorted(by_name.items(), key=lambda x: x[1]["total_cpu"], reverse=True):
+        avg = d["total_cpu"] / d["samples"]
+        report.append(f"{name:<25} {d['samples']:>5} {avg:>5.1f}% {d['max_cpu']:>5.1f}% {len(d['pids']):>5}")
+
+    report.append("\nBy full command:\n")
+    report.append(f"{'Seen':>5} {'Avg%':>6} {'Max%':>6} {'PIDs':>5}  Command")
+    report.append("-" * 60)
+    for cmd, d in sorted(by_cmd.items(), key=lambda x: x[1]["total_cpu"], reverse=True):
+        avg = d["total_cpu"] / d["samples"]
+        cmd_short = cmd if len(cmd) <= 120 else cmd[:117] + "..."
+        cwds = ", ".join(sorted(d["cwds"]))
+        report.append(f"{d['samples']:>5} {avg:>5.1f}% {d['max_cpu']:>5.1f}% {len(d['pids']):>5}  {cmd_short}")
+        report.append(f"       cwd: {cwds}")
+
+    return "\n".join(report)
+
+
 def check_everything():
     hostname = OS.hostname
     now_dt = datetime.datetime.now()
@@ -371,12 +482,14 @@ def check_everything():
 
     failed_systemd = failed_systemd_services(IGNORED_SYSTEMD_SERVICES)
 
+    cpu_report = get_cpu_report()
+
     #failed_systemd = newline + failed_systemd if failed_systemd else ""
     #hard_drives_info = newline + hard_drives_info if hard_drives_info else ""
     #sensors = newline + sensors if sensors else ""
 
-    if sensors or hard_drives_info or failed_systemd:
-        outputs = [sensors, hard_drives_info] + failed_systemd
+    if sensors or hard_drives_info or failed_systemd or cpu_report:
+        outputs = [sensors, hard_drives_info] + failed_systemd + ([cpu_report] if cpu_report else [])
 
         for output in outputs:
             if not output.strip():
