@@ -279,6 +279,8 @@ def analyse_hard_drives(hard_drives, output_all=False, ignore_devices=None):
     A list of strings, where each string is the analysis of the output of the `hddtemp /dev/disk_name` command.
     """
     results = []
+    if not hard_drives.strip():
+        return newline.join(results)
     for hard_drive in Str.nl(hard_drives.strip()):
         disk_info = parse_hard_drive_line(hard_drive)
 
