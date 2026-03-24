@@ -430,9 +430,14 @@ def get_cpu_report():
     by_name = defaultdict(lambda: {"samples": 0, "total_cpu": 0.0, "max_cpu": 0.0, "pids": set()})
     by_cmd = defaultdict(lambda: {"samples": 0, "total_cpu": 0.0, "max_cpu": 0.0, "pids": set(), "cwds": set()})
 
+    ignored_cmds = {"ps -eo pid,%cpu,comm,args --no-headers"}
+    ignored_names = {"ps"}
+
     for i in range(CPU_REPORT_SAMPLES):
         for pid, cpu, name, cmd, cwd in _cpu_sample_processes():
             if cpu < CPU_REPORT_THRESHOLD:
+                continue
+            if name in ignored_names or cmd in ignored_cmds or "cpu_report" in cmd or "temps.py" in cmd:
                 continue
             e = by_name[name]
             e["samples"] += 1
