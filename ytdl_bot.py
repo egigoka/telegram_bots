@@ -1598,30 +1598,25 @@ async def process_download(chat_id, user_id, url):
             print(f"Error cleaning up temp dir: {e}")
 
 
-async def start_telethon_with_retry(max_retries=10):
-    """Start Telethon client with retry logic on connection failure."""
-    for attempt in range(max_retries + 1):
+async def start_telethon_with_retry():
+    """Start Telethon client, retrying every 5 minutes forever while offline."""
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             await TELETHON_CLIENT.start(bot_token=YTDL_TELEGRAM_TOKEN)
             print("Telethon client started")
             return
         except Exception as e:
-            print(f"[TELETHON] Connection failed on attempt {attempt + 1}/{max_retries + 1}: {type(e).__name__}: {e}")
+            print(f"[TELETHON] Connection failed on attempt {attempt}: {type(e).__name__}: {e}")
 
-            if attempt >= max_retries:
-                raise Exception(f"Failed to connect to Telegram after {max_retries + 1} attempts")
-
-            # Disconnect if partially connected
             try:
                 await TELETHON_CLIENT.disconnect()
             except Exception:
                 pass
 
-            print("[TELETHON] Waiting for internet...")
-            if not await wait_for_internet(max_wait=300, check_interval=10):
-                raise Exception("Internet connection not restored after 5 minutes")
-
-            print(f"[TELETHON] Retrying connection (attempt {attempt + 2}/{max_retries + 1})...")
+            print("[TELETHON] Waiting 5 minutes before retry...")
+            await asyncio.sleep(300)
 
 
 async def main():
