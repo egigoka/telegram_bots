@@ -179,6 +179,8 @@ class State:
         self.save_state()
 
     def resume_pause(self):
+        if not self.pause_task_timer_started:
+            return
         self.pause_task_timer_time += self.pause_task_timer.get()
         self.pause_task_timer.start()
         self.pause_task_timer_started = False
